@@ -6,7 +6,7 @@ import { sessions, users } from '../../db/schema.js'
 import { hashPassword, verifyPassword } from './password.js'
 import { loginSchema } from './schemas.js'
 import { newToken, tokenHash, cookieName, cookieOptions } from './session.js'
-import { signIn, AttoInvalidCredentialsError, AttoRateLimitedError, AttoServiceUnavailableError } from '../atto-auth/client.js'
+import { signIn, AttoInvalidCredentialsError, AttoRateLimitedError } from '../atto-auth/client.js'
 import { encryptToken } from '../atto-auth/crypto.js'
 
 type User = typeof users.$inferSelect
@@ -35,11 +35,8 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
     const usernameNormalized = username.trim().toLowerCase()
 
     const [user] = await db.select().from(users).where(eq(users.attoLoginNormalized, usernameNormalized))
-    const genericFail = (reason: string) => {
-      request.log.warn({ event: 'login_rejected', reason, username: usernameNormalized }, 'Login rejeitado')
-      return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: GENERIC_MESSAGE })
-    }
-    if (user && !user.isActive) return genericFail('inactive_user')
+    const genericFail = () => reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: GENERIC_MESSAGE })
+    if (user && !user.isActive) return genericFail()
 
     const minIntervalMs = env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60_000
     const withinCooldown = !!(user?.lastSigninAt && now().getTime() - user.lastSigninAt.getTime() < minIntervalMs)
@@ -60,10 +57,9 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
     if (user?.passwordHash && tokenValid) {
       const valid = await verifyPassword(user.passwordHash, password)
       if (valid) return createSession(user)
-      if (withinCooldown) return genericFail('local_password_mismatch_within_cooldown')
+      if (withinCooldown) return genericFail()
       // Password mismatch after the cooldown window: it may have changed at the Atto side.
     } else if (withinCooldown) {
-      request.log.warn({ event: 'login_cooldown_429', username: usernameNormalized }, 'Login bloqueado por cooldown antes de chamar a Atto')
       const remainingMs = minIntervalMs - (now().getTime() - user!.lastSigninAt!.getTime())
       reply.header('Retry-After', String(Math.max(Math.ceil(remainingMs / 1000), 1)))
       return reply.code(429).send({ statusCode: 429, error: 'Too Many Requests', message: RATE_LIMITED_MESSAGE })
@@ -80,24 +76,16 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
     try {
       result = await flight
     } catch (error) {
-      if (error instanceof AttoInvalidCredentialsError) {
-        request.log.warn({ event: 'login_atto_rejected', username: usernameNormalized, status: error.status, attoError: error.attoError }, 'Atto recusou o SignIn')
-        return genericFail('atto_invalid_credentials')
-      }
+      if (error instanceof AttoInvalidCredentialsError) return genericFail()
       if (error instanceof AttoRateLimitedError) {
-        request.log.warn({ event: 'login_atto_rate_limited', username: usernameNormalized }, 'Atto sinalizou 429 no SignIn')
         if (user) await db.update(users).set({ lastSigninAt: now() }).where(eq(users.id, user.id))
         reply.header('Retry-After', String(env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60))
         return reply.code(429).send({ statusCode: 429, error: 'Too Many Requests', message: RATE_LIMITED_MESSAGE })
       }
-      request.log.warn({ event: 'login_atto_unavailable', username: usernameNormalized, reason: error instanceof AttoServiceUnavailableError ? error.reason : 'unknown' }, 'Falha ao contatar a Atto')
       return reply.code(503).send({ statusCode: 503, error: 'Service Unavailable', message: 'Serviço de autenticação indisponível. Tente novamente em instantes.' })
     }
 
-    if (result.customerSid !== env.ATTO_CUSTOMER_SID) {
-      request.log.warn({ event: 'login_customer_sid_mismatch', username: usernameNormalized, attoLogin: result.login, received: result.customerSid, expected: env.ATTO_CUSTOMER_SID }, 'CustomerSid da Atto não corresponde ao configurado')
-      return genericFail('customer_sid_mismatch')
-    }
+    if (result.customerSid !== env.ATTO_CUSTOMER_SID) return genericFail()
 
     const obtainedAt = now()
     const tokenExpiresAt = new Date(obtainedAt.getTime() + env.ATTO_TOKEN_TTL_HOURS * 3_600_000)
