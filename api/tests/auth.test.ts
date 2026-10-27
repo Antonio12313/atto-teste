@@ -1,13 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import { describe, test, expect, beforeAll, afterEach, vi } from 'vitest'
-import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../src/app.js'
 import { hashPassword } from '../src/modules/auth/password.js'
 import { sessions, users } from '../src/db/schema.js'
 import { tokenHash } from '../src/modules/auth/session.js'
 import { readEnv } from '../src/config/env.js'
-import { db, env, sql } from './setup.js'
+import { db, env } from './setup.js'
 
 const password = randomBytes(24).toString('base64url')
 let hash: string
@@ -126,18 +125,6 @@ describe('Autenticação local', () => {
     expect((await app.inject('/health')).json()).toEqual({ status: 'ok' })
     expect((await app.inject('/protected')).statusCode).toBe(401)
     expect(globalThis.fetch).not.toHaveBeenCalled()
-  })
-  test('last_seen_at é limitado a uma escrita por minuto sem renovar expiração', async () => {
-    const app = await setup(); const response = await login(app)
-    await sql`update sessions set last_seen_at = now() - interval '2 minutes'`
-    const [before] = await db.select().from(sessions)
-    await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })
-    const [after] = await db.select().from(sessions)
-    expect(after!.lastSeenAt.getTime()).toBeGreaterThan(before!.lastSeenAt.getTime())
-    expect(after!.expiresAt).toEqual(before!.expiresAt)
-    await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })
-    const [again] = await db.select().from(sessions).where(eq(sessions.id, after!.id))
-    expect(again!.lastSeenAt).toEqual(after!.lastSeenAt)
   })
   test('logs não expõem senha, cookies ou token', async () => {
     let logs = ''

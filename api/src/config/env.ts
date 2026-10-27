@@ -47,7 +47,6 @@ export type Env = z.infer<typeof envSchema>
 export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const result = envSchema.safeParse(source)
   if (!result.success) {
-    // Report names only: Zod messages can contain supplied values.
     throw new Error(`Configuração inválida. Confira: ${[...new Set(result.error.issues.map(i => i.path.join('.')))].join(', ')}`)
   }
   return result.data

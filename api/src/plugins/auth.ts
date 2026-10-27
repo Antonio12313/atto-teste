@@ -1,4 +1,4 @@
-import { eq, lt, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Env } from '../config/env.js'
 import type { Database } from '../db/client.js'
@@ -29,9 +29,5 @@ export function registerAuth(app: FastifyInstance, db: Database, env: Env) {
     }
     request.user = { id: row.user.id, name: row.user.name, email: row.user.email }
     request.sessionId = row.session.id
-    // Fixed expiry; last_seen_at is updated at most once per minute.
-    await db.update(sessions).set({ lastSeenAt: new Date() }).where(and(
-      eq(sessions.id, row.session.id), lt(sessions.lastSeenAt, new Date(Date.now() - 60_000)),
-    ))
   })
 }

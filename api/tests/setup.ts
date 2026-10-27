@@ -20,7 +20,7 @@ beforeAll(async () => {
   await migrate(db, { migrationsFolder: './drizzle' })
 })
 beforeEach(async () => {
-  await sql`truncate table sessions, users, atto_auth_state cascade`
+  await sql`truncate table sessions, users cascade`
   vi.mocked(globalThis.fetch).mockClear()
 })
 afterAll(async () => { await database.close(); vi.unstubAllGlobals() })
