@@ -1,11 +1,14 @@
 export class AttoInvalidCredentialsError extends Error {
-  constructor() { super('Credenciais recusadas pela Atto.') }
+  // status/attoError never include the password; safe to log for diagnosis.
+  constructor(public readonly status: number, public readonly attoError?: string) {
+    super('Credenciais recusadas pela Atto.')
+  }
 }
 export class AttoRateLimitedError extends Error {
   constructor() { super('Atto sinalizou limite de requisições de login.') }
 }
 export class AttoServiceUnavailableError extends Error {
-  constructor() { super('Falha ao contatar o serviço da Atto.') }
+  constructor(public readonly reason: string) { super('Falha ao contatar o serviço da Atto.') }
 }
 
 export interface AttoSignInResult {
@@ -37,22 +40,25 @@ export async function signIn(login: string, password: string, options: {
       signal: controller.signal,
       redirect: 'error',
     })
-  } catch {
-    throw new AttoServiceUnavailableError()
+  } catch (networkError) {
+    throw new AttoServiceUnavailableError(networkError instanceof Error && networkError.name === 'AbortError' ? 'timeout' : 'network')
   } finally {
     clearTimeout(timer)
   }
   if (response.status === 429) throw new AttoRateLimitedError()
-  if (response.status >= 500) throw new AttoServiceUnavailableError()
-  if (response.status !== 200) throw new AttoInvalidCredentialsError()
+  if (response.status >= 500) throw new AttoServiceUnavailableError(`http-${response.status}`)
+  if (response.status !== 200) throw new AttoInvalidCredentialsError(response.status)
 
   let body: unknown
-  try { body = await response.json() } catch { throw new AttoServiceUnavailableError() }
-  if (!body || typeof body !== 'object') throw new AttoServiceUnavailableError()
+  try { body = await response.json() } catch { throw new AttoServiceUnavailableError('invalid-json') }
+  if (!body || typeof body !== 'object') throw new AttoServiceUnavailableError('invalid-json')
   const payload = body as Record<string, unknown>
-  if (payload.Error != null) throw new AttoInvalidCredentialsError()
+  if (payload.Error != null) {
+    const attoError = typeof payload.Error === 'string' ? payload.Error : JSON.stringify(payload.Error)
+    throw new AttoInvalidCredentialsError(response.status, attoError)
+  }
   if (typeof payload.jwt !== 'string' || !payload.jwt || typeof payload.CustomerSid !== 'string') {
-    throw new AttoServiceUnavailableError()
+    throw new AttoServiceUnavailableError('missing-jwt-or-customersid')
   }
   return {
     sid: typeof payload.Sid === 'string' ? payload.Sid : '',
