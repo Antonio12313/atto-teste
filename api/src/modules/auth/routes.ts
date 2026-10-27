@@ -3,13 +3,9 @@ import type { FastifyInstance } from 'fastify'
 import type { Database } from '../../db/client.js'
 import type { Env } from '../../config/env.js'
 import { sessions, users } from '../../db/schema.js'
-import { hashPassword, verifyPassword } from './password.js'
 import { loginSchema } from './schemas.js'
 import { newToken, tokenHash, cookieName, cookieOptions } from './session.js'
-import { signIn, AttoInvalidCredentialsError, AttoRateLimitedError } from '../atto-auth/client.js'
-import { encryptToken } from '../atto-auth/crypto.js'
-
-type User = typeof users.$inferSelect
+import { createLoginResolver } from './login.js'
 
 const GENERIC_MESSAGE = 'Usuário ou senha inválidos.'
 const RATE_LIMITED_MESSAGE = 'Muitas tentativas. Tente novamente mais tarde.'
@@ -18,10 +14,8 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
   fetch?: typeof globalThis.fetch
   now?: () => Date
 } = {}) {
-  const fetchImpl = deps.fetch ?? globalThis.fetch
   const now = deps.now ?? (() => new Date())
-  // Dedupe concurrent login attempts for the same user into one Atto SignIn.
-  const signInFlights = new Map<string, Promise<Awaited<ReturnType<typeof signIn>>>>()
+  const resolveLogin = createLoginResolver(db, env, deps)
 
   app.post('/auth/login', {
     config: { rateLimit: {
@@ -31,83 +25,28 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
   }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Dados inválidos.' })
-    const { username, password } = parsed.data
-    const usernameNormalized = username.trim().toLowerCase()
 
-    const [user] = await db.select().from(users).where(eq(users.attoLoginNormalized, usernameNormalized))
-    const genericFail = () => reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: GENERIC_MESSAGE })
-    if (user && !user.isActive) return genericFail()
-
-    const minIntervalMs = env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60_000
-    const withinCooldown = !!(user?.lastSigninAt && now().getTime() - user.lastSigninAt.getTime() < minIntervalMs)
-    const tokenValid = !!(user?.tokenEncrypted && !user.tokenInvalidatedAt && user.tokenExpiresAt && user.tokenExpiresAt.getTime() > now().getTime())
-
-    async function createSession(target: User) {
-      const token = newToken()
-      const previous = request.cookies[cookieName]
-      await db.transaction(async tx => {
-        if (previous) await tx.delete(sessions).where(eq(sessions.tokenHash, tokenHash(previous)))
-        await tx.insert(sessions).values({ userId: target.id, tokenHash: tokenHash(token), expiresAt: new Date(now().getTime() + env.SESSION_TTL_HOURS * 3_600_000) })
-        await tx.update(users).set({ lastLoginAt: now(), updatedAt: now() }).where(eq(users.id, target.id))
-      })
-      reply.setCookie(cookieName, token, { ...cookieOptions(env), maxAge: env.SESSION_TTL_HOURS * 3600 })
-      return reply.send({ user: { id: target.id, name: target.name, atto_login: target.attoLogin } })
-    }
-
-    if (user?.passwordHash && tokenValid) {
-      const valid = await verifyPassword(user.passwordHash, password)
-      if (valid) return createSession(user)
-      if (withinCooldown) return genericFail()
-      // Password mismatch after the cooldown window: it may have changed at the Atto side.
-    } else if (withinCooldown) {
-      const remainingMs = minIntervalMs - (now().getTime() - user!.lastSigninAt!.getTime())
-      reply.header('Retry-After', String(Math.max(Math.ceil(remainingMs / 1000), 1)))
-      return reply.code(429).send({ statusCode: 429, error: 'Too Many Requests', message: RATE_LIMITED_MESSAGE })
-    }
-
-    let flight = signInFlights.get(usernameNormalized)
-    if (!flight) {
-      flight = signIn(username.trim(), password, { adminUrl: env.ATTO_ADMIN_URL, timeoutMs: env.ATTO_REQUEST_TIMEOUT_MS, fetch: fetchImpl })
-      signInFlights.set(usernameNormalized, flight)
-      flight.finally(() => signInFlights.delete(usernameNormalized)).catch(() => {})
-    }
-
-    let result: Awaited<typeof flight>
-    try {
-      result = await flight
-    } catch (error) {
-      if (error instanceof AttoInvalidCredentialsError) return genericFail()
-      if (error instanceof AttoRateLimitedError) {
-        if (user) await db.update(users).set({ lastSigninAt: now() }).where(eq(users.id, user.id))
-        reply.header('Retry-After', String(env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60))
+    const outcome = await resolveLogin(parsed.data.username, parsed.data.password)
+    switch (outcome.kind) {
+      case 'rejected':
+        return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: GENERIC_MESSAGE })
+      case 'rate_limited':
+        reply.header('Retry-After', String(outcome.retryAfterSeconds))
         return reply.code(429).send({ statusCode: 429, error: 'Too Many Requests', message: RATE_LIMITED_MESSAGE })
+      case 'unavailable':
+        return reply.code(503).send({ statusCode: 503, error: 'Service Unavailable', message: 'Serviço de autenticação indisponível. Tente novamente em instantes.' })
+      case 'authenticated': {
+        const token = newToken()
+        const previous = request.cookies[cookieName]
+        await db.transaction(async tx => {
+          if (previous) await tx.delete(sessions).where(eq(sessions.tokenHash, tokenHash(previous)))
+          await tx.insert(sessions).values({ userId: outcome.user.id, tokenHash: tokenHash(token), expiresAt: new Date(now().getTime() + env.SESSION_TTL_HOURS * 3_600_000) })
+          await tx.update(users).set({ lastLoginAt: now(), updatedAt: now() }).where(eq(users.id, outcome.user.id))
+        })
+        reply.setCookie(cookieName, token, { ...cookieOptions(env), maxAge: env.SESSION_TTL_HOURS * 3600 })
+        return reply.send({ user: { id: outcome.user.id, name: outcome.user.name, atto_login: outcome.user.attoLogin } })
       }
-      return reply.code(503).send({ statusCode: 503, error: 'Service Unavailable', message: 'Serviço de autenticação indisponível. Tente novamente em instantes.' })
     }
-
-    if (result.customerSid !== env.ATTO_CUSTOMER_SID) return genericFail()
-
-    const obtainedAt = now()
-    const tokenExpiresAt = new Date(obtainedAt.getTime() + env.ATTO_TOKEN_TTL_HOURS * 3_600_000)
-    const passwordHash = await hashPassword(password)
-    const tokenEncrypted = encryptToken(result.jwt, env.ATTO_TOKEN_ENC_KEY)
-    const attoLogin = result.login || username.trim()
-    const name = `${result.name} ${result.surname}`.trim() || attoLogin
-    const [savedUser] = await db.insert(users).values({
-      attoLogin, attoLoginNormalized: usernameNormalized, name,
-      attoSid: result.sid || null, customerSid: result.customerSid, isRoot: result.isRoot, attoRoles: result.roles,
-      passwordHash, tokenEncrypted,
-      tokenObtainedAt: obtainedAt, tokenExpiresAt, tokenInvalidatedAt: null, lastSigninAt: obtainedAt,
-    }).onConflictDoUpdate({
-      target: users.attoLoginNormalized,
-      set: {
-        attoLogin, name, attoSid: result.sid || null, customerSid: result.customerSid,
-        isRoot: result.isRoot, attoRoles: result.roles, passwordHash, tokenEncrypted,
-        tokenObtainedAt: obtainedAt, tokenExpiresAt, tokenInvalidatedAt: null, lastSigninAt: obtainedAt, updatedAt: now(),
-      },
-    }).returning()
-
-    return createSession(savedUser!)
   })
 
   app.get('/auth/me', { preHandler: app.authenticate }, async request => ({ user: request.user! }))
