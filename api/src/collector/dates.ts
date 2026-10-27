@@ -52,6 +52,11 @@ export function dateOnlyInTimezone(date: Date, timeZone: string): string {
   return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`
 }
 
+/** The local hour-of-day (0-23) `date` falls on in `timeZone`. */
+export function hourOfDayInTimezone(date: Date, timeZone: string): number {
+  return partsOf(date, timeZone).hour
+}
+
 export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 86_400_000)
 }

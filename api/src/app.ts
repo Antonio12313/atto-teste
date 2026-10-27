@@ -8,6 +8,7 @@ import type { Env } from './config/env.js'
 import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { adminRoutes } from './modules/admin/routes.js'
+import { dashboardRoutes } from './modules/dashboard/routes.js'
 
 export const redactPaths = ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'password', '*.password', 'token', '*.token', 'jwt', '*.jwt']
 export async function buildApp({ db, env, logger = true, atto }: {
@@ -52,6 +53,7 @@ export async function buildApp({ db, env, logger = true, atto }: {
   registerAuth(app, db, env)
   await authRoutes(app, db, env, atto)
   await adminRoutes(app, db)
+  await dashboardRoutes(app, db, env)
   app.get('/health', async () => ({ status: 'ok' }))
   return app
 }
