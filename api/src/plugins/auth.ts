@@ -1,0 +1,37 @@
+import { eq, lt, and } from 'drizzle-orm'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import type { Env } from '../config/env.js'
+import type { Database } from '../db/client.js'
+import { sessions, users } from '../db/schema.js'
+import { cookieName, cookieOptions, tokenHash } from '../modules/auth/session.js'
+import type { PublicUser } from '../modules/auth/schemas.js'
+
+declare module 'fastify' {
+  interface FastifyRequest { user: PublicUser | null; sessionId: string }
+  interface FastifyInstance { authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void> }
+}
+export function registerAuth(app: FastifyInstance, db: Database, env: Env) {
+  app.decorateRequest('user', null)
+  app.decorateRequest('sessionId', '')
+  app.decorate('authenticate', async (request, reply) => {
+    const token = request.cookies[cookieName(env)]
+    const reject = () => {
+      reply.clearCookie(cookieName(env), cookieOptions(env))
+      reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Autenticação necessária.' })
+    }
+    if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) { reject(); return }
+    const [row] = await db.select({ session: sessions, user: users }).from(sessions)
+      .innerJoin(users, eq(users.id, sessions.userId)).where(eq(sessions.tokenHash, tokenHash(token)))
+    if (!row) { reject(); return }
+    if (!row.user.isActive || row.session.expiresAt <= new Date()) {
+      await db.delete(sessions).where(eq(sessions.id, row.session.id))
+      reject(); return
+    }
+    request.user = { id: row.user.id, name: row.user.name, email: row.user.email }
+    request.sessionId = row.session.id
+    // Fixed expiry; last_seen_at is updated at most once per minute.
+    await db.update(sessions).set({ lastSeenAt: new Date() }).where(and(
+      eq(sessions.id, row.session.id), lt(sessions.lastSeenAt, new Date(Date.now() - 60_000)),
+    ))
+  })
+}
