@@ -45,8 +45,9 @@ describe('Login autenticado pela Atto', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ user: { id: expect.any(String), name: 'Ana Silva', atto_login: 'ana.silva' } })
     expect(request.mock.calls).toHaveLength(1)
-    const sentBody = JSON.parse(String(request.mock.calls[0]![1]?.body))
-    expect(sentBody).toEqual({ Login: 'Ana.Silva', Password: 'senha-correta-1' })
+    const [sentUrl, sentInit] = request.mock.calls[0]!
+    expect(String(sentUrl)).toBe(`${env.ATTO_ADMIN_URL}/Login/SignIn?login=Ana.Silva&password=senha-correta-1`)
+    expect((sentInit as RequestInit)?.method).toBe('GET')
 
     const user = await userRow()
     expect(user!.attoLoginNormalized).toBe('ana.silva')

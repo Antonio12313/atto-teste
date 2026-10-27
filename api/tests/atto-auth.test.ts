@@ -36,8 +36,9 @@ describe('Atto: cliente de SignIn', () => {
     const result = await signIn('ana', 'segredo', { ...options, fetch: fetchMock })
     expect(result).toEqual({ sid: 's1', customerSid: 'c1', login: 'ana', name: 'Ana', surname: 'Silva', isRoot: true, roles: ['admin'], jwt: 'token-123' })
     const [url, init] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://atto.example/AdminService.svc/Login/SignIn')
-    expect(JSON.parse(String(init?.body))).toEqual({ Login: 'ana', Password: 'segredo' })
+    expect(url).toBe('https://atto.example/AdminService.svc/Login/SignIn?login=ana&password=segredo')
+    expect((init as RequestInit)?.method).toBe('GET')
+    expect((init as RequestInit)?.body).toBeUndefined()
   })
   test('Error preenchido na resposta 200 é credencial inválida', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ Error: 'nok' }), { status: 200 }))

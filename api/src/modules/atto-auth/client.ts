@@ -27,12 +27,13 @@ export async function signIn(login: string, password: string, options: {
   const request = options.fetch ?? globalThis.fetch
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs)
+  // The real endpoint is GET with login/password as lowercase query params, not a POST body.
+  const query = new URLSearchParams({ login, password })
   let response: Response
   try {
-    response = await request(`${options.adminUrl.replace(/\/$/, '')}/Login/SignIn`, {
-      method: 'POST',
+    response = await request(`${options.adminUrl.replace(/\/$/, '')}/Login/SignIn?${query.toString()}`, {
+      method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Login: login, Password: password }),
       signal: controller.signal,
       redirect: 'error',
     })
