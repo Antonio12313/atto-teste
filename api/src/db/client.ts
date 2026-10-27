@@ -6,4 +6,3 @@ export function createDatabase(url: string) {
   return { sql, db: drizzle(sql, { schema }), close: () => sql.end() }
 }
 export type Database = ReturnType<typeof createDatabase>['db']
-export type SqlClient = ReturnType<typeof createDatabase>['sql']

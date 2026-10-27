@@ -128,7 +128,8 @@ cd web && pnpm lint && pnpm typecheck
 | `fastify-type-provider-zod` | Removido | 3 rotas não justificam a camada; `zod.safeParse()` manual é igualmente seguro e remove uma dependência |
 | `compose.test.yaml` | Removido | Não referenciado por script, README ou CI |
 | Checagem de `Origin` e `Content-Type` em mutações | Mantida | Poucas linhas, já testada, cobre CSRF básico que `SameSite=Lax` só mitiga parcialmente |
-| Criptografia do token da Atto (AES-256-GCM) | Mantida | O `jwt` carrega usuário e senha da conta Atto — exigência explícita do teste |
+| Criptografia do token da Atto (AES-256-GCM via `node:crypto`) | Mantida, sem lib de terceiros | É o mesmo motor (OpenSSL) que qualquer lib JS de cripto usa por baixo; a única opção que reduziria o código de fato (`@47ng/cloak`) traz 8 dependências transitivas, o que contradiz esta limpeza |
+| `getValidToken`/`invalidate` em `atto-auth` (helpers para o futuro coletor) | Removidos | Nada chama esse código ainda; é mais simples recriá-lo quando o coletor existir do que mantê-lo sem uso agora |
 | Validação de env no boot (zod) | Mantida | Evita subir com configuração inválida |
 | Seed de administrador | **Não implementado** | Criar um usuário aqui sempre exige uma conta Atto real, que não há como fabricar neste repositório; o primeiro login bem-sucedido (de quem quer que seja o primeiro administrador) já cria o usuário, tornando um seed redundante |
 | Esquema da migration inicial | Regenerado do zero a cada mudança de schema nesta etapa (sem migrations incrementais) | Não há dado real em nenhum ambiente ainda; registrar isso aqui para não repetir a prática quando passar a haver dados reais |

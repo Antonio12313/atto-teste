@@ -8,7 +8,7 @@ import type { Env } from './config/env.js'
 import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 
-export const redactPaths = ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', '*.password', '*.token', 'password', 'token', 'jwt', '*.jwt', 'Authorization', '*.Authorization', 'Login', 'Password', '*.Password']
+export const redactPaths = ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'password', '*.password', 'token', '*.token', 'jwt', '*.jwt']
 export async function buildApp({ db, env, logger = true, atto }: {
   db: Database; env: Env; logger?: FastifyServerOptions['logger']
   atto?: { fetch?: typeof globalThis.fetch; now?: () => Date }
