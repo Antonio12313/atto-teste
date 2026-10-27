@@ -1,0 +1,13 @@
+# Override only for disposable test runners; the regular stack still has 3 services.
+services:
+  api:
+    build:
+      context: ./api
+      target: build
+    restart: "no"
+    command: ["pnpm", "test"]
+  web:
+    build:
+      context: ./web
+      target: build
+    restart: "no"

@@ -1,5 +1,5 @@
 import { eq, lt, and } from 'drizzle-orm'
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Env } from '../config/env.js'
 import type { Database } from '../db/client.js'
 import { sessions, users } from '../db/schema.js'
