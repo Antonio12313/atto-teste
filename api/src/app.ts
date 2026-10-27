@@ -7,6 +7,7 @@ import type { Database } from './db/client.js'
 import type { Env } from './config/env.js'
 import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
+import { adminRoutes } from './modules/admin/routes.js'
 
 export const redactPaths = ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'password', '*.password', 'token', '*.token', 'jwt', '*.jwt']
 export async function buildApp({ db, env, logger = true, atto }: {
@@ -31,7 +32,9 @@ export async function buildApp({ db, env, logger = true, atto }: {
     }
   })
   app.addHook('onSend', async (request, reply) => {
-    if (request.url.startsWith('/auth/')) reply.header('Cache-Control', 'no-store')
+    if (request.url.startsWith('/auth/') || request.url.startsWith('/admin/') || request.url.startsWith('/dashboard/')) {
+      reply.header('Cache-Control', 'no-store')
+    }
   })
   app.setErrorHandler((error, request, reply) => {
     const e = error as { statusCode?: number; validation?: unknown }
@@ -48,6 +51,7 @@ export async function buildApp({ db, env, logger = true, atto }: {
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'Rota não encontrada.' }))
   registerAuth(app, db, env)
   await authRoutes(app, db, env, atto)
+  await adminRoutes(app, db)
   app.get('/health', async () => ({ status: 'ok' }))
   return app
 }
