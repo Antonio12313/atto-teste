@@ -147,3 +147,31 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Sistema operacional e editores
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Builds, testes e ferramentas locais
+build/
+.vercel/
+playwright-report/
+test-results/
+
+# Credenciais e dados locais
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+*.sql.gz
+postgres_data/
+.pgdata/
+.aws/
