@@ -27,7 +27,7 @@ export function registerAuth(app: FastifyInstance, db: Database, env: Env) {
       await db.delete(sessions).where(eq(sessions.id, row.session.id))
       reject(); return
     }
-    request.user = { id: row.user.id, name: row.user.name, email: row.user.email }
+    request.user = { id: row.user.id, name: row.user.name, atto_login: row.user.attoLogin }
     request.sessionId = row.session.id
   })
 }

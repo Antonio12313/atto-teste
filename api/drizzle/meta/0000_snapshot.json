@@ -1,5 +1,5 @@
 {
-  "id": "6c7be82c-e763-4141-9f6b-3980dd275864",
+  "id": "51a82a81-a168-4465-8e5a-123d5e174a4e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -82,23 +82,84 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "atto_login": {
+          "name": "atto_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atto_login_normalized": {
+          "name": "atto_login_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "email": {
-          "name": "email",
+        "atto_sid": {
+          "name": "atto_sid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "customer_sid": {
+          "name": "customer_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_root": {
+          "name": "is_root",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "atto_roles": {
+          "name": "atto_roles",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "password_hash": {
           "name": "password_hash",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "token_encrypted": {
+          "name": "token_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_obtained_at": {
+          "name": "token_obtained_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_expires_at": {
+          "name": "token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_invalidated_at": {
+          "name": "token_invalidated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_signin_at": {
+          "name": "last_signin_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "is_active": {
           "name": "is_active",
@@ -132,19 +193,19 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_email_unique": {
-          "name": "users_email_unique",
+        "users_atto_login_normalized_unique": {
+          "name": "users_atto_login_normalized_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "email"
+            "atto_login_normalized"
           ]
         }
       },
       "policies": {},
       "checkConstraints": {
-        "users_email_normalized": {
-          "name": "users_email_normalized",
-          "value": "\"users\".\"email\" = lower(btrim(\"users\".\"email\"))"
+        "users_atto_login_normalized": {
+          "name": "users_atto_login_normalized",
+          "value": "\"users\".\"atto_login_normalized\" = lower(btrim(\"users\".\"atto_login\"))"
         }
       },
       "isRLSEnabled": false

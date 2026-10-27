@@ -9,7 +9,10 @@ import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 
 export const redactPaths = ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', '*.password', '*.token', 'password', 'token', 'jwt', '*.jwt', 'Authorization', '*.Authorization', 'Login', 'Password', '*.Password']
-export async function buildApp({ db, env, logger = true }: { db: Database; env: Env; logger?: FastifyServerOptions['logger'] }) {
+export async function buildApp({ db, env, logger = true, atto }: {
+  db: Database; env: Env; logger?: FastifyServerOptions['logger']
+  atto?: { fetch?: typeof globalThis.fetch; now?: () => Date }
+}) {
   const app = Fastify({
     trustProxy: false, bodyLimit: 16384,
     logger: logger === false ? false : { ...(typeof logger === 'object' ? logger : {}), redact: redactPaths },
@@ -44,7 +47,7 @@ export async function buildApp({ db, env, logger = true }: { db: Database; env: 
   })
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'Rota não encontrada.' }))
   registerAuth(app, db, env)
-  await authRoutes(app, db, env)
+  await authRoutes(app, db, env, atto)
   app.get('/health', async () => ({ status: 'ok' }))
   return app
 }
