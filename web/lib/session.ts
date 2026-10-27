@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { z } from "zod"
 
 const sessionSchema = z.object({
-  user: z.object({ id: z.uuid(), name: z.string(), email: z.email() }),
+  user: z.object({ id: z.uuid(), name: z.string(), atto_login: z.string() }),
 })
 export const getSession = cache(async () => {
   const cookieStore = await cookies()

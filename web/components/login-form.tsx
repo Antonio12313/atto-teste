@@ -13,11 +13,7 @@ import { api } from "@/lib/api"
 import { safeNext } from "@/lib/safe-next"
 
 const schema = z.object({
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .pipe(z.email("Informe um e-mail válido.")),
+  username: z.string().trim().min(1, "Informe seu usuário."),
   password: z
     .string()
     .min(1, "Informe sua senha.")
@@ -32,7 +28,7 @@ export function LoginForm({ next }: { next: string }) {
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { username: "", password: "" },
   })
   const submit = handleSubmit(async (data) => {
     setError("")
@@ -56,20 +52,20 @@ export function LoginForm({ next }: { next: string }) {
       aria-busy={isSubmitting}
     >
       <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
+        <Label htmlFor="username">Usuário</Label>
         <Input
-          id="email"
-          type="email"
+          id="username"
+          type="text"
           autoComplete="username"
           autoFocus
           disabled={isSubmitting}
-          aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? "email-error" : undefined}
-          {...register("email")}
+          aria-invalid={!!errors.username}
+          aria-describedby={errors.username ? "username-error" : undefined}
+          {...register("username")}
         />
-        {errors.email && (
-          <p id="email-error" className="text-sm text-destructive" role="alert">
-            {errors.email.message}
+        {errors.username && (
+          <p id="username-error" className="text-sm text-destructive" role="alert">
+            {errors.username.message}
           </p>
         )}
       </div>

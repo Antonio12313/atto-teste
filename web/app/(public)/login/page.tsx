@@ -28,7 +28,7 @@ export default async function LoginPage({
           <CardHeader>
             <CardTitle className="text-2xl">Acesse sua conta</CardTitle>
             <CardDescription>
-              Entre com seu e-mail e senha para continuar.
+              Entre com seu usuário e senha da Atto para continuar.
             </CardDescription>
           </CardHeader>
           <CardContent>

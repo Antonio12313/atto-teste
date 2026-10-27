@@ -23,8 +23,9 @@ export async function api(path: string, body: unknown) {
   }
   if (!response.ok) {
     const messages: Record<number, string> = {
-      401: "E-mail ou senha inválidos.",
-      429: "Muitas tentativas. Tente novamente em instantes.",
+      401: "Usuário ou senha inválidos.",
+      429: "Muitas tentativas. Tente novamente mais tarde.",
+      503: "Serviço de autenticação indisponível. Tente novamente em instantes.",
     }
     throw new ApiError(
       response.status,
