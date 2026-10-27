@@ -5,6 +5,7 @@ import { z } from "zod"
 
 const sessionSchema = z.object({
   user: z.object({ id: z.uuid(), name: z.string(), atto_login: z.string() }),
+  permissions: z.array(z.string()),
 })
 export const getSession = cache(async () => {
   const cookieStore = await cookies()
@@ -17,5 +18,6 @@ export const getSession = cache(async () => {
   if (response.status === 401) return null
   if (!response.ok)
     throw new Error("Não foi possível validar sua sessão. Tente novamente.")
-  return sessionSchema.parse(await response.json()).user
+  const { user, permissions } = sessionSchema.parse(await response.json())
+  return { ...user, permissions }
 })

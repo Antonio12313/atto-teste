@@ -10,7 +10,7 @@ export function LogoutButton() {
     setLoading(true)
     setError("")
     try {
-      await api("/auth/logout", {})
+      await api("/auth/logout")
       window.location.assign("/login")
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {

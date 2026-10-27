@@ -33,7 +33,7 @@ export function LoginForm({ next }: { next: string }) {
   const submit = handleSubmit(async (data) => {
     setError("")
     try {
-      await api("/auth/login", data)
+      await api("/auth/login", { body: data })
       // A full navigation also discards any pre-login Router Cache.
       window.location.assign(safeNext(next))
     } catch (error) {

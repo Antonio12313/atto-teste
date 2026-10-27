@@ -6,14 +6,22 @@ export class ApiError extends Error {
     super(message)
   }
 }
-export async function api(path: string, body: unknown) {
+
+// The API already replies with a localized { message } for every error
+// status it produces, so the client just surfaces that directly.
+export async function api<T = undefined>(
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  const method = options.method ?? "POST"
+  const isMutating = method !== "GET"
   let response: Response
   try {
     response = await fetch(`/api${path}`, {
-      method: "POST",
+      method,
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: isMutating ? { "Content-Type": "application/json" } : {},
+      body: isMutating ? JSON.stringify(options.body ?? {}) : undefined,
     })
   } catch {
     throw new ApiError(
@@ -21,16 +29,14 @@ export async function api(path: string, body: unknown) {
       "Não foi possível conectar. Verifique sua conexão e tente novamente."
     )
   }
+  if (response.status === 204) return undefined as T
+  const data = await response.json().catch(() => null)
   if (!response.ok) {
-    const messages: Record<number, string> = {
-      401: "Usuário ou senha inválidos.",
-      429: "Muitas tentativas. Tente novamente mais tarde.",
-      503: "Serviço de autenticação indisponível. Tente novamente em instantes.",
-    }
-    throw new ApiError(
-      response.status,
-      messages[response.status] ??
-        "Não foi possível concluir. Tente novamente em instantes."
-    )
+    const message =
+      data && typeof data.message === "string"
+        ? data.message
+        : "Não foi possível concluir. Tente novamente em instantes."
+    throw new ApiError(response.status, message)
   }
+  return data as T
 }
