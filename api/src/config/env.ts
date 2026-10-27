@@ -30,6 +30,13 @@ export const envSchema = z.object({
   // Atto itself only accepts one SignIn per login per hour; a lower local value would be pointless.
   ATTO_LOGIN_MIN_INTERVAL_MINUTES: positive.min(60).default(60),
   ATTO_REQUEST_TIMEOUT_MS: positive.max(120000).default(15000),
+  COLLECT_INTERVAL_MINUTES: positive.default(15),
+  COLLECT_BACKFILL_DAYS: positive.default(7),
+  COLLECT_CALLS_LOOKBACK_HOURS: positive.default(24),
+  // Atto rate-limits Agents/* to one call every 6s minimum; enforce the floor here too.
+  COLLECT_DELAY_AGENTS_MS: positive.min(6000).default(6000),
+  COLLECT_DELAY_OTHERS_MS: positive.default(1000),
+  APP_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
 }).superRefine((env, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
   if (env.NODE_ENV === 'production' && !env.COOKIE_SECURE) issue('COOKIE_SECURE', 'Produção exige HTTPS e COOKIE_SECURE=true')

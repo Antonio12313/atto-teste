@@ -4,6 +4,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "collector": "node dist/collector.js",
+    "collector:dev": "tsx src/collector.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node dist/db/migrate.js",
     "seed": "node dist/scripts/seed.js",

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, boolean, jsonb, timestamp, check, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, integer, jsonb, timestamp, date, check, primaryKey } from 'drizzle-orm/pg-core'
 const time = (name: string) => timestamp(name, { withTimezone: true })
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -49,3 +49,49 @@ export const userPermissions = pgTable('user_permissions', {
   node: text('node').notNull(),
   effect: text('effect', { enum: ['allow', 'deny'] }).notNull(),
 }, t => [primaryKey({ columns: [t.userId, t.node] })])
+
+// Collector tables: written only by the scheduled collector, read-only for
+// the dashboard. campaignSid defaults to '' (never null) so the natural-key
+// upserts below work — Postgres treats NULL as distinct from NULL in a
+// unique/primary key, which would silently defeat ON CONFLICT dedup.
+export const attoCampaigns = pgTable('atto_campaigns', {
+  sid: text('sid').primaryKey(),
+  name: text('name').notNull(),
+  updatedAt: time('updated_at').notNull().defaultNow(),
+})
+export const attoAgentReport = pgTable('atto_agent_report', {
+  day: date('day').notNull(),
+  agentLogin: text('agent_login').notNull(),
+  campaignSid: text('campaign_sid').notNull().default(''),
+  answeredCalls: integer('answered_calls').notNull().default(0),
+  talkSeconds: integer('talk_seconds').notNull().default(0),
+  updatedAt: time('updated_at').notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.day, t.agentLogin, t.campaignSid] })])
+export const attoWorkingTime = pgTable('atto_working_time', {
+  sessionKey: text('session_key').primaryKey(),
+  agentLogin: text('agent_login').notNull(),
+  campaignSid: text('campaign_sid').notNull().default(''),
+  loginAt: time('login_at').notNull(),
+  logoutAt: time('logout_at'),
+  loggedSeconds: integer('logged_seconds').notNull().default(0),
+  pausedSeconds: integer('paused_seconds').notNull().default(0),
+  updatedAt: time('updated_at').notNull().defaultNow(),
+})
+export const attoCallsHourly = pgTable('atto_calls_hourly', {
+  hourStart: time('hour_start').notNull(),
+  campaignSid: text('campaign_sid').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  answered: integer('answered').notNull().default(0),
+  talkSeconds: integer('talk_seconds').notNull().default(0),
+  final: boolean('final').notNull().default(false),
+  updatedAt: time('updated_at').notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.hourStart, t.campaignSid] })])
+export const attoCollectRuns = pgTable('atto_collect_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  startedAt: time('started_at').notNull(),
+  finishedAt: time('finished_at'),
+  status: text('status', { enum: ['ok', 'partial', 'error'] }).notNull(),
+  trigger: text('trigger', { enum: ['scheduled', 'once'] }).notNull(),
+  records: jsonb('records'),
+  error: text('error'),
+})

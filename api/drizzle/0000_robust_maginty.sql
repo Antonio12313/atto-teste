@@ -1,3 +1,51 @@
+CREATE TABLE "atto_agent_report" (
+	"day" date NOT NULL,
+	"agent_login" text NOT NULL,
+	"campaign_sid" text DEFAULT '' NOT NULL,
+	"answered_calls" integer DEFAULT 0 NOT NULL,
+	"talk_seconds" integer DEFAULT 0 NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "atto_agent_report_day_agent_login_campaign_sid_pk" PRIMARY KEY("day","agent_login","campaign_sid")
+);
+--> statement-breakpoint
+CREATE TABLE "atto_calls_hourly" (
+	"hour_start" timestamp with time zone NOT NULL,
+	"campaign_sid" text NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"answered" integer DEFAULT 0 NOT NULL,
+	"talk_seconds" integer DEFAULT 0 NOT NULL,
+	"final" boolean DEFAULT false NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "atto_calls_hourly_hour_start_campaign_sid_pk" PRIMARY KEY("hour_start","campaign_sid")
+);
+--> statement-breakpoint
+CREATE TABLE "atto_campaigns" (
+	"sid" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "atto_collect_runs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"status" text NOT NULL,
+	"trigger" text NOT NULL,
+	"records" jsonb,
+	"error" text
+);
+--> statement-breakpoint
+CREATE TABLE "atto_working_time" (
+	"session_key" text PRIMARY KEY NOT NULL,
+	"agent_login" text NOT NULL,
+	"campaign_sid" text DEFAULT '' NOT NULL,
+	"login_at" timestamp with time zone NOT NULL,
+	"logout_at" timestamp with time zone,
+	"logged_seconds" integer DEFAULT 0 NOT NULL,
+	"paused_seconds" integer DEFAULT 0 NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "role_permissions" (
 	"role_id" uuid NOT NULL,
 	"node" text NOT NULL,
