@@ -107,10 +107,10 @@ describe('Autenticação local', () => {
     expect((await app.inject({ method: 'POST', url: '/auth/logout', payload: 'bad', headers: { 'content-type': 'text/plain' } })).statusCode).toBe(415)
     expect((await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: cookie(response), origin: env.WEB_ORIGIN }, payload: {} })).statusCode).toBe(204)
   })
-  test('produção usa __Host-sid com Secure, Path=/ e sem Domain', async () => {
+  test('produção usa Secure, Path=/ e sem Domain', async () => {
     const app = await setup({ NODE_ENV: 'production', COOKIE_SECURE: true })
     const response = await login(app)
-    expect(response.headers['set-cookie']).toMatch(/^__Host-sid=/)
+    expect(response.headers['set-cookie']).toMatch(/^sid=/)
     expect(response.headers['set-cookie']).toContain('Secure')
     expect(response.headers['set-cookie']).toContain('Path=/')
     expect(response.headers['set-cookie']).not.toContain('Domain=')

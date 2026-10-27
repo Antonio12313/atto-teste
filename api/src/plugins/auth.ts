@@ -14,9 +14,9 @@ export function registerAuth(app: FastifyInstance, db: Database, env: Env) {
   app.decorateRequest('user', null)
   app.decorateRequest('sessionId', '')
   app.decorate('authenticate', async (request, reply) => {
-    const token = request.cookies[cookieName(env)]
+    const token = request.cookies[cookieName]
     const reject = () => {
-      reply.clearCookie(cookieName(env), cookieOptions(env))
+      reply.clearCookie(cookieName, cookieOptions(env))
       reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Autenticação necessária.' })
     }
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) { reject(); return }

@@ -8,7 +8,7 @@ const sessionSchema = z.object({
 })
 export const getSession = cache(async () => {
   const cookieStore = await cookies()
-  const cookie = cookieStore.get("__Host-sid") ?? cookieStore.get("sid")
+  const cookie = cookieStore.get("sid")
   if (!cookie) return null
   const response = await fetch(`${process.env.API_INTERNAL_URL}/auth/me`, {
     headers: { cookie: `${cookie.name}=${cookie.value}` },
