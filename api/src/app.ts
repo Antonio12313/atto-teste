@@ -3,7 +3,6 @@ import type { FastifyServerOptions } from 'fastify'
 import cookie from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
-import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod'
 import type { Database } from './db/client.js'
 import type { Env } from './config/env.js'
 import { registerAuth } from './plugins/auth.js'
@@ -15,8 +14,6 @@ export async function buildApp({ db, env, logger = true }: { db: Database; env: 
     trustProxy: false, bodyLimit: 16384,
     logger: logger === false ? false : { ...(typeof logger === 'object' ? logger : {}), redact: redactPaths },
   })
-  app.setValidatorCompiler(validatorCompiler)
-  app.setSerializerCompiler(serializerCompiler)
   await app.register(cookie)
   await app.register(helmet)
   await app.register(rateLimit, { global: false })
