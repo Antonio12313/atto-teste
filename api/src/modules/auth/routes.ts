@@ -6,6 +6,8 @@ import { sessions, users } from '../../db/schema.js'
 import { loginSchema } from './schemas.js'
 import { newToken, tokenHash, cookieName, cookieOptions } from './session.js'
 import { createLoginResolver } from './login.js'
+import { loadResolveContext } from '../../permissions/load.js'
+import { resolveAllPermissions } from '../../permissions/resolve.js'
 
 const GENERIC_MESSAGE = 'Usuário ou senha inválidos.'
 const RATE_LIMITED_MESSAGE = 'Muitas tentativas. Tente novamente mais tarde.'
@@ -49,7 +51,10 @@ export async function authRoutes(app: FastifyInstance, db: Database, env: Env, d
     }
   })
 
-  app.get('/auth/me', { preHandler: app.authenticate }, async request => ({ user: request.user! }))
+  app.get('/auth/me', { preHandler: app.authenticate }, async request => {
+    const ctx = await loadResolveContext(db, request.user!.id)
+    return { user: request.user!, permissions: resolveAllPermissions(ctx) }
+  })
   app.post('/auth/logout', { preHandler: app.authenticate }, async (request, reply) => {
     await db.delete(sessions).where(eq(sessions.id, request.sessionId))
     return reply.clearCookie(cookieName, cookieOptions(env)).code(204).send()

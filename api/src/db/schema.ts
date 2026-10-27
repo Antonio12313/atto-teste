@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, boolean, jsonb, timestamp, check } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, jsonb, timestamp, check, primaryKey } from 'drizzle-orm/pg-core'
 const time = (name: string) => timestamp(name, { withTimezone: true })
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -28,3 +28,24 @@ export const sessions = pgTable('sessions', {
   createdAt: time('created_at').notNull().defaultNow(),
   expiresAt: time('expires_at').notNull(),
 })
+
+export const roles = pgTable('roles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description'),
+  createdAt: time('created_at').notNull().defaultNow(),
+  updatedAt: time('updated_at').notNull().defaultNow(),
+})
+export const rolePermissions = pgTable('role_permissions', {
+  roleId: uuid('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
+  node: text('node').notNull(),
+}, t => [primaryKey({ columns: [t.roleId, t.node] })])
+export const userRoles = pgTable('user_roles', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  roleId: uuid('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
+}, t => [primaryKey({ columns: [t.userId, t.roleId] })])
+export const userPermissions = pgTable('user_permissions', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  node: text('node').notNull(),
+  effect: text('effect', { enum: ['allow', 'deny'] }).notNull(),
+}, t => [primaryKey({ columns: [t.userId, t.node] })])

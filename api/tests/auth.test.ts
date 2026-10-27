@@ -160,7 +160,7 @@ describe('Login autenticado pela Atto', () => {
     const response = await login(app)
     const me = await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })
     expect(me.statusCode).toBe(200)
-    expect(me.json()).toEqual(response.json())
+    expect(me.json()).toEqual({ ...response.json(), permissions: [] })
     await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: cookie(response) }, payload: {} })
     expect((await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })).statusCode).toBe(401)
   })

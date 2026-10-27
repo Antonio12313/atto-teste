@@ -20,4 +20,4 @@ COPY --from=build --chown=node:node /app/drizzle ./drizzle
 COPY --chown=node:node package.json ./
 USER node
 EXPOSE 3030
-CMD ["sh", "-c", "node dist/db/migrate.js && exec node dist/server.js"]
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/scripts/seed.js && exec node dist/server.js"]
