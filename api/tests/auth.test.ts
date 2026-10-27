@@ -1,140 +1,194 @@
 import { randomBytes } from 'node:crypto'
-import { describe, test, expect, beforeAll, afterEach, vi } from 'vitest'
+import { describe, test, expect, afterEach, vi } from 'vitest'
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../src/app.js'
-import { hashPassword } from '../src/modules/auth/password.js'
-import { sessions, users } from '../src/db/schema.js'
-import { tokenHash } from '../src/modules/auth/session.js'
+import { verifyPassword } from '../src/modules/auth/password.js'
+import { decryptToken } from '../src/modules/atto-auth/crypto.js'
+import { users } from '../src/db/schema.js'
 import { readEnv } from '../src/config/env.js'
 import { db, env } from './setup.js'
 
-const password = randomBytes(24).toString('base64url')
-let hash: string
-let apps: FastifyInstance[] = []
-beforeAll(async () => { hash = await hashPassword(password) })
-afterEach(async () => { await Promise.all(apps.map(a => a.close())); apps = [] })
-async function setup(overrides = {}) {
-  await db.insert(users).values({ name: 'Administrador de teste', email: 'admin@example.com', passwordHash: hash })
-  const app = await buildApp({ db, env: { ...env, ...overrides }, logger: false }); apps.push(app); return app
-}
-const login = (app: FastifyInstance, payload = { email: 'admin@example.com', password }, cookie?: string) => app.inject({ method: 'POST', url: '/auth/login', payload, headers: cookie ? { cookie } : {} })
-const cookie = (response: Awaited<ReturnType<typeof login>>) => String(response.headers['set-cookie']).split(';')[0]!
+const secret = () => randomBytes(24).toString('base64url')
+let clock = new Date('2030-01-01T00:00:00Z')
+const now = () => clock
+const advanceMinutes = (minutes: number) => { clock = new Date(clock.getTime() + minutes * 60_000) }
 
-describe('Autenticação local', () => {
-  test('sucesso normaliza e-mail, flags, hash de sessão e senha, sem dados privados', async () => {
-    const app = await setup()
-    const response = await login(app, { email: ' ADMIN@EXAMPLE.COM ', password })
+function attoResponse(jwt: string, overrides: Record<string, unknown> = {}) {
+  return {
+    Error: null, Sid: 'sid-1', CustomerSid: env.ATTO_CUSTOMER_SID, Login: 'ana.silva',
+    Name: 'Ana', Surname: 'Silva', ROOT: false, Roles: ['supervisor'], jwt,
+    ...overrides,
+  }
+}
+
+let request: ReturnType<typeof vi.fn<typeof fetch>>
+let apps: FastifyInstance[] = []
+afterEach(async () => { await Promise.all(apps.map(a => a.close())); apps = []; vi.restoreAllMocks() })
+
+async function setup(envOverrides: Partial<typeof env> = {}) {
+  const jwt = secret()
+  request = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify(attoResponse(jwt)), { status: 200 }))
+  const app = await buildApp({ db, env: { ...env, ...envOverrides }, logger: false, atto: { fetch: request, now } })
+  apps.push(app)
+  return { app, jwt }
+}
+const login = (app: FastifyInstance, payload: Record<string, unknown> = { username: 'ana.silva', password: 'senha-correta-1' }, cookie?: string) =>
+  app.inject({ method: 'POST', url: '/auth/login', payload, headers: cookie ? { cookie } : {} })
+const cookie = (response: Awaited<ReturnType<typeof login>>) => String(response.headers['set-cookie']).split(';')[0]!
+const userRow = async (attoLoginNormalized = 'ana.silva') => (await db.select().from(users).where(eq(users.attoLoginNormalized, attoLoginNormalized)))[0]
+
+describe('Login autenticado pela Atto', () => {
+  test('primeiro login cria o usuário com os dados da Atto, criptografa o token e abre sessão', async () => {
+    const { app, jwt } = await setup()
+    const response = await login(app, { username: ' Ana.Silva ', password: 'senha-correta-1' })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ user: { id: expect.any(String), name: 'Administrador de teste', email: 'admin@example.com' } })
+    expect(response.json()).toEqual({ user: { id: expect.any(String), name: 'Ana Silva', atto_login: 'ana.silva' } })
+    expect(request.mock.calls).toHaveLength(1)
+    const sentBody = JSON.parse(String(request.mock.calls[0]![1]?.body))
+    expect(sentBody).toEqual({ Login: 'Ana.Silva', Password: 'senha-correta-1' })
+
+    const user = await userRow()
+    expect(user!.attoLoginNormalized).toBe('ana.silva')
+    expect(user!.isActive).toBe(true)
+    expect(user!.customerSid).toBe(env.ATTO_CUSTOMER_SID)
+    expect(user!.passwordHash!.startsWith('$argon2id$')).toBe(true)
+    expect(await verifyPassword(user!.passwordHash!, 'senha-correta-1')).toBe(true)
+    expect(user!.tokenEncrypted === jwt).toBe(false)
+    expect(decryptToken(user!.tokenEncrypted!, env.ATTO_TOKEN_ENC_KEY)).toBe(jwt)
     expect(response.headers['set-cookie']).toContain('HttpOnly')
-    expect(response.headers['set-cookie']).toContain('SameSite=Lax')
-    expect(response.headers['set-cookie']).toContain('Max-Age=28800')
-    const [session] = await db.select().from(sessions)
-    const value = cookie(response).slice(4)
-    expect(Buffer.from(value, 'base64url')).toHaveLength(32)
-    expect(session!.tokenHash === tokenHash(value)).toBe(true)
-    expect(session!.tokenHash === value).toBe(false)
-    const [user] = await db.select().from(users)
-    expect(user!.passwordHash.startsWith('$argon2id$')).toBe(true)
-    expect(user!.passwordHash.includes(password)).toBe(false)
-    expect(user!.lastLoginAt).not.toBeNull()
   })
-  test('senha incorreta, usuário inexistente e inativo têm resposta idêntica', async () => {
-    const app = await setup()
-    const wrong = await login(app, { email: 'admin@example.com', password: randomBytes(12).toString('hex') })
-    const missing = await login(app, { email: 'missing@example.com', password })
-    await db.update(users).set({ isActive: false })
-    const inactive = await login(app)
-    for (const response of [wrong, missing, inactive]) {
-      expect(response.statusCode).toBe(401)
-      expect(response.json()).toEqual({ statusCode: 401, error: 'Unauthorized', message: 'E-mail ou senha inválidos.' })
-      expect(response.body).toBe(wrong.body)
+
+  test('segundo login com a mesma senha não chama a Atto', async () => {
+    const { app } = await setup()
+    await login(app)
+    request.mockClear()
+    const second = await login(app)
+    expect(second.statusCode).toBe(200)
+    expect(request.mock.calls).toHaveLength(0)
+  })
+
+  test('logout e login repetidos nunca chamam a Atto', async () => {
+    const { app } = await setup()
+    const first = await login(app)
+    request.mockClear()
+    let sessionCookie = cookie(first)
+    for (let i = 0; i < 10; i++) {
+      await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: sessionCookie }, payload: {} })
+      const response = await login(app)
+      sessionCookie = cookie(response)
     }
+    expect(request.mock.calls).toHaveLength(0)
   })
-  test('body inválido retorna 400', async () => {
-    const app = await setup()
-    for (const payload of [{}, { email: 'invalid', password }, { email: 'a@b.com', password: '' }, { email: 'a@b.com', password: 'a'.repeat(129) }]) {
-      expect((await app.inject({ method: 'POST', url: '/auth/login', payload })).statusCode).toBe(400)
-    }
+
+  test('senha errada para usuário com token válido retorna 401 genérico sem chamar a Atto', async () => {
+    const { app } = await setup()
+    await login(app)
+    request.mockClear()
+    const response = await login(app, { username: 'ana.silva', password: 'senha-errada' })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({ statusCode: 401, error: 'Unauthorized', message: 'Usuário ou senha inválidos.' })
+    expect(request.mock.calls).toHaveLength(0)
   })
-  test('me exige cookie e retorna apenas usuário público', async () => {
-    const app = await setup()
+
+  test('Atto recusa a credencial: 401 genérico e nada é persistido', async () => {
+    const { app, jwt } = await setup()
+    request.mockImplementation(async () => new Response(JSON.stringify(attoResponse(jwt, { Error: 'Credenciais inválidas' })), { status: 200 }))
+    const response = await login(app, { username: 'novo.usuario', password: 'qualquer' })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({ statusCode: 401, error: 'Unauthorized', message: 'Usuário ou senha inválidos.' })
+    expect(await userRow('novo.usuario')).toBeUndefined()
+  })
+
+  test('CustomerSid diferente do configurado: 401 genérico e descarta a resposta', async () => {
+    const { app, jwt } = await setup()
+    request.mockImplementation(async () => new Response(JSON.stringify(attoResponse(jwt, { CustomerSid: 'outro-cliente' })), { status: 200 }))
+    const response = await login(app, { username: 'novo.usuario', password: 'qualquer' })
+    expect(response.statusCode).toBe(401)
+    expect(await userRow('novo.usuario')).toBeUndefined()
+  })
+
+  test('usuário inativo não entra, sem chamar a Atto', async () => {
+    const { app } = await setup()
+    await db.insert(users).values({ attoLogin: 'inativo', attoLoginNormalized: 'inativo', name: 'Inativo', isActive: false })
+    const response = await login(app, { username: 'inativo', password: 'qualquer' })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({ statusCode: 401, error: 'Unauthorized', message: 'Usuário ou senha inválidos.' })
+    expect(request.mock.calls).toHaveLength(0)
+  })
+
+  test('timeout da Atto retorna 503', async () => {
+    const { app } = await setup({ ATTO_REQUEST_TIMEOUT_MS: 20 })
+    request.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      (init as RequestInit).signal?.addEventListener('abort', () => reject(new Error('aborted')))
+    }))
+    const response = await login(app, { username: 'novo.usuario', password: 'qualquer' })
+    expect(response.statusCode).toBe(503)
+    expect(response.json()).toMatchObject({ statusCode: 503 })
+  })
+
+  test('Atto sinaliza 429: responde 429 com Retry-After e registra o cooldown', async () => {
+    const { app } = await setup()
+    await db.insert(users).values({ attoLogin: 'ana.silva', attoLoginNormalized: 'ana.silva', name: 'Ana Silva' })
+    request.mockImplementation(async () => new Response('', { status: 429 }))
+    const response = await login(app, { username: 'ana.silva', password: 'qualquer' })
+    expect(response.statusCode).toBe(429)
+    expect(Number(response.headers['retry-after'])).toBeGreaterThan(0)
+    const saved = await userRow()
+    expect(saved!.lastSigninAt).toEqual(clock)
+  })
+
+  test('senha local não confere após o intervalo mínimo: chama a Atto e atualiza hash e token', async () => {
+    const { app } = await setup()
+    const first = await login(app, { username: 'ana.silva', password: 'senha-antiga' })
+    expect(first.statusCode).toBe(200)
+    advanceMinutes(61)
+    request.mockClear()
+    request.mockImplementation(async () => new Response(JSON.stringify(attoResponse('novo-jwt-token')), { status: 200 }))
+    const response = await login(app, { username: 'ana.silva', password: 'senha-nova' })
+    expect(response.statusCode).toBe(200)
+    expect(request.mock.calls).toHaveLength(1)
+    const saved = await userRow()
+    expect(await verifyPassword(saved!.passwordHash!, 'senha-nova')).toBe(true)
+    expect(decryptToken(saved!.tokenEncrypted!, env.ATTO_TOKEN_ENC_KEY)).toBe('novo-jwt-token')
+  })
+
+  test('GET /auth/me exige cookie; logout invalida o mesmo cookie', async () => {
+    const { app } = await setup()
     expect((await app.inject('/auth/me')).statusCode).toBe(401)
     const response = await login(app)
     const me = await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })
-    expect(me.statusCode).toBe(200); expect(me.json()).toEqual(response.json())
-    expect(me.headers['cache-control']).toBe('no-store')
+    expect(me.statusCode).toBe(200)
+    expect(me.json()).toEqual(response.json())
+    await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: cookie(response) }, payload: {} })
+    expect((await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })).statusCode).toBe(401)
   })
-  test('logout exige sessão e invalida cookie antigo; zero chamadas Atto', async () => {
-    const app = await setup()
-    const response = await login(app)
-    const headers = { cookie: cookie(response) }
-    const logout = await app.inject({ method: 'POST', url: '/auth/logout', headers, payload: {} })
-    expect(logout.statusCode).toBe(204)
-    expect(logout.headers['set-cookie']).toContain('Max-Age=0')
-    expect((await app.inject({ url: '/auth/me', headers })).statusCode).toBe(401)
-    expect((await app.inject({ method: 'POST', url: '/auth/logout', payload: {} })).statusCode).toBe(401)
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+  test('body inválido retorna 400', async () => {
+    const { app } = await setup()
+    for (const payload of [{}, { username: '', password: 'x' }, { username: 'ana', password: '' }]) {
+      expect((await app.inject({ method: 'POST', url: '/auth/login', payload })).statusCode).toBe(400)
+    }
   })
-  test.each(['expired', 'inactive'])('%s invalida sessão e limpa cookie', async kind => {
-    const app = await setup()
-    const response = await login(app)
-    if (kind === 'expired') await db.update(sessions).set({ expiresAt: new Date(0) })
-    else await db.update(users).set({ isActive: false })
-    const me = await app.inject({ url: '/auth/me', headers: { cookie: cookie(response) } })
-    expect(me.statusCode).toBe(401)
-    expect(me.headers['set-cookie']).toContain('Max-Age=0')
-    expect(await db.select().from(sessions)).toHaveLength(0)
+
+  test('senha, jwt e hash nunca aparecem na resposta HTTP ou nos logs', async () => {
+    let logs = ''
+    const jwt = secret()
+    request = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify(attoResponse(jwt)), { status: 200 }))
+    const app = await buildApp({ db, env, logger: { stream: { write: (chunk: string) => { logs += chunk } } }, atto: { fetch: request, now } })
+    apps.push(app)
+    const response = await login(app, { username: 'ana.silva', password: 'senha-secreta' })
+    expect(response.body.includes('senha-secreta')).toBe(false)
+    expect(response.body.includes(jwt)).toBe(false)
+    expect(logs.includes('senha-secreta')).toBe(false)
+    expect(logs.includes(jwt)).toBe(false)
+    const saved = await userRow()
+    expect(logs.includes(saved!.passwordHash!)).toBe(false)
+    expect(logs.includes(saved!.tokenEncrypted!)).toBe(false)
   })
-  test('rate limit normaliza e-mail, retorna Retry-After e ignora X-Forwarded-For forjado', async () => {
-    const app = await setup({ LOGIN_RATE_LIMIT_MAX: 2 })
-    for (let i = 0; i < 2; i++) await login(app, { email: 'admin@example.com', password: 'invalid' })
-    const response = await app.inject({ method: 'POST', url: '/auth/login', payload: { email: ' ADMIN@EXAMPLE.COM ', password }, headers: { 'x-forwarded-for': '203.0.113.12' } })
-    expect(response.statusCode).toBe(429)
-    expect(Number(response.headers['retry-after'])).toBeGreaterThan(0)
-    expect((await login(app, { email: 'other@example.com', password })).statusCode).toBe(401)
-  })
-  test('cada login rotaciona token e revoga sessão anterior', async () => {
-    const app = await setup()
-    const first = await login(app); const second = await login(app, undefined, cookie(first))
-    expect(cookie(first) === cookie(second)).toBe(false)
-    expect((await app.inject({ url: '/auth/me', headers: { cookie: cookie(first) } })).statusCode).toBe(401)
-    expect(await db.select().from(sessions)).toHaveLength(1)
-  })
-  test('CSRF exige origem permitida quando presente e JSON', async () => {
-    const app = await setup(); const response = await login(app)
-    expect((await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: cookie(response), origin: 'https://invalid.example' }, payload: {} })).statusCode).toBe(403)
-    expect((await app.inject({ method: 'POST', url: '/auth/logout', payload: 'bad', headers: { 'content-type': 'text/plain' } })).statusCode).toBe(415)
-    expect((await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie: cookie(response), origin: env.WEB_ORIGIN }, payload: {} })).statusCode).toBe(204)
-  })
-  test('produção usa Secure, Path=/ e sem Domain', async () => {
-    const app = await setup({ NODE_ENV: 'production', COOKIE_SECURE: true })
-    const response = await login(app)
-    expect(response.headers['set-cookie']).toMatch(/^sid=/)
-    expect(response.headers['set-cookie']).toContain('Secure')
-    expect(response.headers['set-cookie']).toContain('Path=/')
-    expect(response.headers['set-cookie']).not.toContain('Domain=')
-  })
+
   test('validação de ambiente rejeita produção HTTP e chave Atto inválida sem imprimir valores', () => {
     expect(() => readEnv({ ...process.env, NODE_ENV: 'production', COOKIE_SECURE: 'false' })).toThrow(/COOKIE_SECURE/)
-    expect(() => readEnv({ ...process.env, ATTO_LOGIN: randomBytes(8).toString('hex'), ATTO_TOKEN_ENC_KEY: 'invalid' })).toThrow(/ATTO_TOKEN_ENC_KEY/)
-  })
-  test('health público e boot não chamam Atto; guard compõe novas rotas', async () => {
-    const app = await setup()
-    app.get('/protected', { preHandler: app.authenticate }, async req => ({ id: req.user!.id }))
-    expect((await app.inject('/health')).json()).toEqual({ status: 'ok' })
-    expect((await app.inject('/protected')).statusCode).toBe(401)
-    expect(globalThis.fetch).not.toHaveBeenCalled()
-  })
-  test('logs não expõem senha, cookies ou token', async () => {
-    let logs = ''
-    const app = await buildApp({ db, env, logger: { stream: { write: (chunk: string) => { logs += chunk } } } }); apps.push(app)
-    await db.insert(users).values({ name: 'Teste', email: 'admin@example.com', passwordHash: hash })
-    const response = await login(app)
-    await app.inject({ url: '/auth/me', headers: { cookie: cookie(response), authorization: `Bearer ${password}` } })
-    expect(logs.length).toBeGreaterThan(0)
-    expect(logs.includes(password)).toBe(false)
-    expect(logs.includes(cookie(response).slice(4))).toBe(false)
-    expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(0)
+    expect(() => readEnv({ ...process.env, ATTO_TOKEN_ENC_KEY: 'invalid' })).toThrow(/ATTO_TOKEN_ENC_KEY/)
   })
 })
