@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { getSession } from "@/lib/session"
 import { serverApi } from "@/lib/server-api"
+import { formatDateTime } from "@/lib/format"
 import { NoAccess } from "@/components/no-access"
 import { UserCreateDialog } from "@/components/admin/user-create-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -67,7 +68,7 @@ export default async function UsersPage() {
                 </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("pt-BR") : "Nunca"}
+                {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : "Nunca"}
               </TableCell>
               <TableCell>
                 <Link href={`/admin/usuarios/${user.id}`} className="text-sm underline-offset-4 hover:underline">

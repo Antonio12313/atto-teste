@@ -1,6 +1,7 @@
 import { AlertTriangle, Clock, PhoneIncoming, PhoneOutgoing, TimerOff, Trophy } from "lucide-react"
 import { getSession } from "@/lib/session"
 import { serverApi, ServerApiError } from "@/lib/server-api"
+import { formatDateTime } from "@/lib/format"
 import { NoAccess } from "@/components/no-access"
 import { DashboardFilters } from "@/components/dashboard/filters"
 import { CallsByHourChart } from "@/components/dashboard/calls-chart"
@@ -125,7 +126,7 @@ export default async function DashboardPage({
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
           {meta.updatedAt
-            ? `Atualizado em ${new Date(meta.updatedAt).toLocaleString("pt-BR")}`
+            ? `Atualizado em ${formatDateTime(meta.updatedAt)}`
             : "Ainda sem coleta registrada."}
         </p>
       </div>
