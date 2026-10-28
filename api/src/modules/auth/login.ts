@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm'
 import type { Database } from '../../db/client.js'
 import type { Env } from '../../config/env.js'
-import { users } from '../../db/schema.js'
+import { users, roles, rolePermissions, userRoles } from '../../db/schema.js'
+import { ALL_NODES } from '../../permissions/tree.js'
 import { hashPassword, verifyPassword } from './password.js'
 import { signIn, AttoInvalidCredentialsError, AttoRateLimitedError } from '../atto-auth/client.js'
 import { encryptToken } from '../atto-auth/crypto.js'
@@ -13,6 +14,17 @@ export type LoginOutcome =
   | { kind: 'rejected' }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
   | { kind: 'unavailable' }
+
+/** First user ever to sign in successfully: there's no seed, so without this
+ *  bootstrap nobody would ever have admin.usuarios to grant anyone else access. */
+async function grantFullAccess(db: Database, userId: string) {
+  const [inserted] = await db.insert(roles).values({ name: 'Administrador' })
+    .onConflictDoNothing({ target: roles.name }).returning({ id: roles.id })
+  const roleId = inserted?.id ?? (await db.select({ id: roles.id }).from(roles).where(eq(roles.name, 'Administrador')))[0]!.id
+  await db.insert(rolePermissions).values(ALL_NODES.map(node => ({ roleId, node })))
+    .onConflictDoNothing({ target: [rolePermissions.roleId, rolePermissions.node] })
+  await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing({ target: [userRoles.userId, userRoles.roleId] })
+}
 
 /**
  * All the Atto-login business rules, decoupled from HTTP: local-vs-Atto
@@ -32,13 +44,16 @@ export function createLoginResolver(db: Database, env: Env, deps: {
     const usernameNormalized = username.trim().toLowerCase()
     const [user] = await db.select().from(users).where(eq(users.attoLoginNormalized, usernameNormalized))
     if (user && !user.isActive) return { kind: 'rejected' }
+    const tenantOk = (currentUser: User) => currentUser.customerSid === env.ATTO_CUSTOMER_SID
 
     const minIntervalMs = env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60_000
     const withinCooldown = !!(user?.lastSigninAt && now().getTime() - user.lastSigninAt.getTime() < minIntervalMs)
     const tokenValid = !!(user?.tokenEncrypted && !user.tokenInvalidatedAt && user.tokenExpiresAt && user.tokenExpiresAt.getTime() > now().getTime())
 
     if (user?.passwordHash && tokenValid) {
-      if (await verifyPassword(user.passwordHash, password)) return { kind: 'authenticated', user }
+      if (await verifyPassword(user.passwordHash, password)) {
+        return tenantOk(user) ? { kind: 'authenticated', user } : { kind: 'rejected' }
+      }
       if (withinCooldown) return { kind: 'rejected' }
       // Password mismatch after the cooldown window: it may have changed at the Atto side.
     } else if (withinCooldown) {
@@ -65,7 +80,10 @@ export function createLoginResolver(db: Database, env: Env, deps: {
       return { kind: 'unavailable' }
     }
 
-    if (result.customerSid !== env.ATTO_CUSTOMER_SID) return { kind: 'rejected' }
+    // A successful SignIn is precious (Atto allows one per login per hour), so it's
+    // always persisted below — even if the CustomerSid check rejects the session —
+    // so this exact attempt is never wasted and a retry can reuse it locally.
+    const isFirstUserEver = !user && (await db.select({ id: users.id }).from(users).limit(1)).length === 0
 
     const obtainedAt = now()
     const tokenExpiresAt = new Date(obtainedAt.getTime() + env.ATTO_TOKEN_TTL_HOURS * 3_600_000)
@@ -87,6 +105,8 @@ export function createLoginResolver(db: Database, env: Env, deps: {
       },
     }).returning()
 
+    if (isFirstUserEver) await grantFullAccess(db, savedUser!.id)
+    if (result.customerSid !== env.ATTO_CUSTOMER_SID) return { kind: 'rejected' }
     return { kind: 'authenticated', user: savedUser! }
   }
 }

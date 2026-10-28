@@ -3,14 +3,13 @@ import { z } from 'zod'
 const positive = z.coerce.number().int().positive()
 const optionalSecret = z.string().default('')
 export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']),
+  NODE_ENV: z.enum(['development', 'production']),
   API_PORT: positive.max(65535),
   API_HOST: z.string().min(1),
   POSTGRES_USER: z.string().min(1),
   POSTGRES_PASSWORD: z.string().min(1),
   POSTGRES_DB: z.string().min(1),
   DATABASE_URL: z.url().refine(v => /^postgres(ql)?:/.test(v)),
-  DATABASE_URL_TEST: z.url().optional(),
   WEB_ORIGIN: z.url().refine(v => new URL(v).origin === v, 'Use somente a origem, sem caminho'),
   SESSION_TTL_HOURS: positive.max(720),
   COOKIE_SECURE: z.enum(['true', 'false']).transform(v => v === 'true'),
@@ -22,7 +21,7 @@ export const envSchema = z.object({
   DB_PORT: positive.max(65535),
   ATTO_ADMIN_URL: z.url().default('https://cloud.attodigital.com/AttoSolution/WebAdmin/Services/AdminService.svc'),
   ATTO_SUPERVISION_URL: z.url().default('https://cloud.attodigital.com/AttoSolution/WebSupervision/Services/SupService.svc'),
-  ATTO_LOGIN: z.string().trim().min(1),
+  ATTO_LOGIN: optionalSecret,
   ATTO_PASSWORD: optionalSecret,
   ATTO_CUSTOMER_SID: z.string().trim().min(1),
   ATTO_TOKEN_ENC_KEY: z.string().min(1),

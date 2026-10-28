@@ -8,10 +8,6 @@
     "collector:dev": "tsx src/collector.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node dist/db/migrate.js",
-    "seed": "node dist/scripts/seed.js",
-    "seed:dev": "tsx src/scripts/seed.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.check.json"
   },
@@ -32,7 +28,6 @@
     "eslint": "^10.13.0",
     "tsx": "^4.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "^5.0.5"
+    "typescript-eslint": "^8.72.1"
   }
 }
