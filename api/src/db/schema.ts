@@ -6,6 +6,9 @@ export const users = pgTable('users', {
   attoLogin: text('atto_login').notNull(),
   attoLoginNormalized: text('atto_login_normalized').notNull().unique(),
   name: text('name').notNull(),
+  // Local accounts have their own admin-set password and never talk to Atto;
+  // everyone else is a mirror of a real Atto account (see auth/login.ts).
+  isLocal: boolean('is_local').notNull().default(false),
   attoSid: text('atto_sid'),
   customerSid: text('customer_sid'),
   isRoot: boolean('is_root').notNull().default(false),

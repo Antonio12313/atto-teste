@@ -7,6 +7,7 @@ import { isUniqueViolation, isForeignKeyViolation } from '../../db/errors.js'
 import { PERMISSION_TREE, ALL_NODES } from '../../permissions/tree.js'
 import { resolvePermission, type PermissionEffect, type ResolveContext } from '../../permissions/resolve.js'
 import { loadResolveContext } from '../../permissions/load.js'
+import { hashPassword } from '../auth/password.js'
 import { roleCreateSchema, roleUpdateSchema, userCreateSchema, userUpdateSchema } from './schemas.js'
 
 const BAD_REQUEST = { statusCode: 400, error: 'Bad Request', message: 'Dados inválidos.' }
@@ -33,7 +34,7 @@ async function buildUserDetail(db: Database, userId: string) {
   return {
     user: {
       id: user.id, attoLogin: user.attoLogin, name: user.name, isActive: user.isActive,
-      isRoot: user.isRoot, lastLoginAt: user.lastLoginAt, createdAt: user.createdAt,
+      isLocal: user.isLocal, isRoot: user.isRoot, lastLoginAt: user.lastLoginAt, createdAt: user.createdAt,
     },
     roleIds: roleLinks.map(role => role.id),
     individual: individualRows.map(row => ({ node: row.node, effect: row.effect as PermissionEffect })),
@@ -114,7 +115,7 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     for (const row of roleLinks) rolesByUser.set(row.userId, [...(rolesByUser.get(row.userId) ?? []), row.name])
     return {
       users: userRows.map(user => ({
-        id: user.id, attoLogin: user.attoLogin, name: user.name, isActive: user.isActive,
+        id: user.id, attoLogin: user.attoLogin, name: user.name, isActive: user.isActive, isLocal: user.isLocal,
         roles: rolesByUser.get(user.id) ?? [], lastLoginAt: user.lastLoginAt,
       })),
     }
@@ -133,12 +134,14 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     if (!parsed.success) return reply.code(400).send(BAD_REQUEST)
     const attoLoginNormalized = parsed.data.attoLogin.trim().toLowerCase()
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.attoLoginNormalized, attoLoginNormalized))
-    if (existing) return reply.code(409).send({ statusCode: 409, error: 'Conflict', message: 'Já existe um usuário com esse login da Atto.' })
+    if (existing) return reply.code(409).send({ statusCode: 409, error: 'Conflict', message: 'Já existe um usuário com esse login.' })
 
     try {
+      const isLocal = !!parsed.data.password
       const [user] = await db.insert(users).values({
         attoLogin: parsed.data.attoLogin.trim(), attoLoginNormalized,
         name: parsed.data.name?.trim() || parsed.data.attoLogin.trim(),
+        isLocal, passwordHash: isLocal ? await hashPassword(parsed.data.password!) : null,
       }).returning()
       if (parsed.data.roleIds.length) await db.insert(userRoles).values(parsed.data.roleIds.map(roleId => ({ userId: user!.id, roleId })))
       if (parsed.data.individual.length) {
@@ -159,6 +162,10 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     const [existing] = await db.select().from(users).where(eq(users.id, id.data.id))
     if (!existing) return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'Usuário não encontrado.' })
 
+    if (parsed.data.password !== undefined && !existing.isLocal) {
+      return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Esta conta é da Atto; a senha vem de lá, não pode ser definida aqui.' })
+    }
+
     const isSelf = id.data.id === request.user!.id
     if (isSelf && parsed.data.isActive === false) {
       return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Você não pode desativar sua própria conta.' })
@@ -174,10 +181,11 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     }
 
     try {
-      if (parsed.data.name !== undefined || parsed.data.isActive !== undefined) {
+      if (parsed.data.name !== undefined || parsed.data.isActive !== undefined || parsed.data.password !== undefined) {
         await db.update(users).set({
           ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
           ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+          ...(parsed.data.password !== undefined ? { passwordHash: await hashPassword(parsed.data.password) } : {}),
           updatedAt: new Date(),
         }).where(eq(users.id, id.data.id))
       }

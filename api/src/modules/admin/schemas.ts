@@ -16,15 +16,20 @@ export const roleUpdateSchema = z.object({
   nodes: z.array(nodeSchema).optional(),
 })
 
+// A password here means "create a local account" (own password, never talks
+// to Atto). Without one, it's the usual Atto pre-register: no password, no
+// token, until the real account's first login completes it.
 export const userCreateSchema = z.object({
   attoLogin: z.string().trim().min(1).max(254),
   name: z.string().trim().min(1).max(200).optional(),
+  password: z.string().min(8).max(128).optional(),
   roleIds: z.array(z.uuid()).default([]),
   individual: z.array(individualRuleSchema).default([]),
 })
 export const userUpdateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   isActive: z.boolean().optional(),
+  password: z.string().min(8).max(128).optional(),
   roleIds: z.array(z.uuid()).optional(),
   individual: z.array(individualRuleSchema).optional(),
 })

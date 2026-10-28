@@ -33,6 +33,7 @@ export interface UserDetail {
     attoLogin: string
     name: string
     isActive: boolean
+    isLocal: boolean
     isRoot: boolean
     lastLoginAt: string | null
     createdAt: string
@@ -59,6 +60,7 @@ export function UserForm({
     new Map(initial.individual.map((rule) => [rule.node, rule.effect]))
   )
   const [effective, setEffective] = useState(initial.effective)
+  const [newPassword, setNewPassword] = useState("")
   const [saving, setSaving] = useState(false)
 
   const effectiveByNode = useMemo(() => new Map(effective.map((entry) => [entry.node, entry])), [effective])
@@ -100,9 +102,11 @@ export function UserForm({
         isActive,
         roleIds: [...roleIds],
         individual: [...individual.entries()].map(([node, effect]) => ({ node, effect })),
+        ...(initial.user.isLocal && newPassword ? { password: newPassword } : {}),
       }
       const updated = await api<UserDetail>(`/admin/users/${initial.user.id}`, { method: "PATCH", body })
       setEffective(updated.effective)
+      setNewPassword("")
       toast.success("Usuário atualizado.")
       router.refresh()
     } catch (error) {
@@ -116,14 +120,31 @@ export function UserForm({
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>Login da Atto</Label>
-          <p className="text-sm text-muted-foreground">{initial.user.attoLogin}</p>
+          <Label>Login</Label>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            {initial.user.attoLogin}
+            <Badge variant="outline">{initial.user.isLocal ? "Local" : "Atto"}</Badge>
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="user-name">Nome</Label>
           <Input id="user-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
       </div>
+
+      {initial.user.isLocal && (
+        <div className="space-y-2">
+          <Label htmlFor="user-new-password">Nova senha</Label>
+          <Input
+            id="user-new-password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Deixe em branco para manter a atual"
+            className="max-w-sm"
+          />
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm">
         <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} />

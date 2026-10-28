@@ -44,6 +44,14 @@ export function createLoginResolver(db: Database, env: Env, deps: {
     const usernameNormalized = username.trim().toLowerCase()
     const [user] = await db.select().from(users).where(eq(users.attoLoginNormalized, usernameNormalized))
     if (user && !user.isActive) return { kind: 'rejected' }
+
+    // Local accounts (admin-created, own password) never talk to Atto at all —
+    // no cooldown, no token, no tenant check, just a direct password check.
+    if (user?.isLocal) {
+      if (!user.passwordHash) return { kind: 'rejected' }
+      return (await verifyPassword(user.passwordHash, password)) ? { kind: 'authenticated', user } : { kind: 'rejected' }
+    }
+
     const tenantOk = (currentUser: User) => currentUser.customerSid === env.ATTO_CUSTOMER_SID
 
     const minIntervalMs = env.ATTO_LOGIN_MIN_INTERVAL_MINUTES * 60_000

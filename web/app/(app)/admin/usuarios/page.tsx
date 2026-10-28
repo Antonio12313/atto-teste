@@ -18,6 +18,7 @@ interface UserRow {
   attoLogin: string
   name: string
   isActive: boolean
+  isLocal: boolean
   roles: string[]
   lastLoginAt: string | null
 }
@@ -37,7 +38,8 @@ export default async function UsersPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Nome</TableHead>
-            <TableHead>Login da Atto</TableHead>
+            <TableHead>Login</TableHead>
+            <TableHead>Conta</TableHead>
             <TableHead>Perfis</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Último login</TableHead>
@@ -49,6 +51,9 @@ export default async function UsersPage() {
             <TableRow key={user.id}>
               <TableCell className="font-medium">{user.name}</TableCell>
               <TableCell className="text-muted-foreground">{user.attoLogin}</TableCell>
+              <TableCell>
+                <Badge variant="outline">{user.isLocal ? "Local" : "Atto"}</Badge>
+              </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {user.roles.length
