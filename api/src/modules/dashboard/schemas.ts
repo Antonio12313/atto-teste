@@ -1,10 +1,27 @@
 import { z } from 'zod'
 
-export const rangeQuerySchema = z.object({
+const rangeFields = {
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD.'),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD.'),
   campaignId: z.string().trim().min(1).optional(),
-}).refine(q => q.from <= q.to, { message: '"from" deve ser anterior ou igual a "to".' })
-  .refine(q => (new Date(`${q.to}T00:00:00Z`).getTime() - new Date(`${q.from}T00:00:00Z`).getTime()) / 86_400_000 <= 90, {
-    message: 'Intervalo máximo de 90 dias.',
-  })
+}
+function fromBeforeTo(q: { from: string; to: string }) {
+  return q.from <= q.to
+}
+function within90Days(q: { from: string; to: string }) {
+  return (new Date(`${q.to}T00:00:00Z`).getTime() - new Date(`${q.from}T00:00:00Z`).getTime()) / 86_400_000 <= 90
+}
+
+export const rangeQuerySchema = z.object(rangeFields)
+  .refine(fromBeforeTo, { message: '"from" deve ser anterior ou igual a "to".' })
+  .refine(within90Days, { message: 'Intervalo máximo de 90 dias.' })
+
+/** Same range filter, plus pagination and a free-text search (by agent login/name). */
+export const pagedRangeQuerySchema = z.object({
+  ...rangeFields,
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().trim().min(1).max(100).optional(),
+})
+  .refine(fromBeforeTo, { message: '"from" deve ser anterior ou igual a "to".' })
+  .refine(within90Days, { message: 'Intervalo máximo de 90 dias.' })

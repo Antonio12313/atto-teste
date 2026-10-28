@@ -2,13 +2,31 @@ import { and, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Database } from '../../db/client.js'
 import type { Env } from '../../config/env.js'
-import { attoCampaigns, attoCollectRuns, attoCallsHourly, attoAgentReport, attoWorkingTime } from '../../db/schema.js'
+import { attoCampaigns, attoAgents, attoCollectRuns, attoCallsHourly, attoAgentReport, attoWorkingTime } from '../../db/schema.js'
 import { ALL_NODES } from '../../permissions/tree.js'
 import { dayStartInTimezone, addDays, hourOfDayInTimezone } from '../../collector/dates.js'
-import { rangeQuerySchema } from './schemas.js'
+import { rangeQuerySchema, pagedRangeQuerySchema } from './schemas.js'
 
 const BAD_REQUEST = { statusCode: 400, error: 'Bad Request', message: 'Dados inválidos.' }
 const DASHBOARD_NODES = ALL_NODES.filter(node => node === 'dashboard' || node.startsWith('dashboard.'))
+
+/** Agents/Report and Agents/WorkingTime only carry the agent's login — the
+ * real name comes from the separately-collected Agents/List (atto_agents). */
+async function loadAgentNames(db: Database, logins: string[]): Promise<Map<string, string>> {
+  if (!logins.length) return new Map()
+  const rows = await db.select({ login: attoAgents.login, name: attoAgents.name }).from(attoAgents).where(inArray(attoAgents.login, logins))
+  return new Map(rows.filter((r): r is { login: string; name: string } => !!r.name).map(r => [r.login, r.name]))
+}
+function matchesSearch(q: string | undefined, ...fields: Array<string | null | undefined>): boolean {
+  if (!q) return true
+  const needle = q.toLowerCase()
+  return fields.some(f => f?.toLowerCase().includes(needle))
+}
+function paginate<T>(items: T[], page: number, pageSize: number): { items: T[]; total: number } {
+  const total = items.length
+  const start = (page - 1) * pageSize
+  return { items: items.slice(start, start + pageSize), total }
+}
 
 export async function dashboardRoutes(app: FastifyInstance, db: Database, env: Env) {
   app.get('/dashboard/atto/meta', { preHandler: [app.authenticate, app.requirePermission(DASHBOARD_NODES)] }, async () => {
@@ -51,9 +69,9 @@ export async function dashboardRoutes(app: FastifyInstance, db: Database, env: E
   })
 
   app.get('/dashboard/atto/agentes', { preHandler: [app.authenticate, app.requirePermission('dashboard.atto.agentes')] }, async (request, reply) => {
-    const parsed = rangeQuerySchema.safeParse(request.query)
+    const parsed = pagedRangeQuerySchema.safeParse(request.query)
     if (!parsed.success) return reply.code(400).send(BAD_REQUEST)
-    const { from, to } = parsed.data
+    const { from, to, page, pageSize, q } = parsed.data
 
     const rows = await db.select().from(attoAgentReport).where(and(gte(attoAgentReport.day, from), lte(attoAgentReport.day, to)))
     const byAgent = new Map<string, { answeredCalls: number; talkSeconds: number }>()
@@ -63,17 +81,23 @@ export async function dashboardRoutes(app: FastifyInstance, db: Database, env: E
       acc.talkSeconds += row.talkSeconds
       byAgent.set(row.agentLogin, acc)
     }
-    const ranking = [...byAgent.entries()]
-      .map(([agentLogin, acc]) => ({ agentLogin, answeredCalls: acc.answeredCalls, avgTalkSeconds: acc.answeredCalls ? acc.talkSeconds / acc.answeredCalls : 0 }))
+    const names = await loadAgentNames(db, [...byAgent.keys()])
+    const fullRanking = [...byAgent.entries()]
+      .map(([agentLogin, acc]) => ({
+        agentLogin, agentName: names.get(agentLogin) ?? null,
+        answeredCalls: acc.answeredCalls, avgTalkSeconds: acc.answeredCalls ? acc.talkSeconds / acc.answeredCalls : 0,
+      }))
+      .filter(r => matchesSearch(q, r.agentLogin, r.agentName))
       .sort((a, b) => b.answeredCalls - a.answeredCalls)
+    const { items: ranking, total } = paginate(fullRanking, page, pageSize)
     // Agents/Report isn't scoped by campaign in the Atto response, so this block can't filter by it.
-    return { ranking, campaignFilterSupported: false }
+    return { ranking, total, page, pageSize, campaignFilterSupported: false }
   })
 
   app.get('/dashboard/atto/tempo', { preHandler: [app.authenticate, app.requirePermission('dashboard.atto.tempo')] }, async (request, reply) => {
-    const parsed = rangeQuerySchema.safeParse(request.query)
+    const parsed = pagedRangeQuerySchema.safeParse(request.query)
     if (!parsed.success) return reply.code(400).send(BAD_REQUEST)
-    const { from, to, campaignId } = parsed.data
+    const { from, to, campaignId, page, pageSize, q } = parsed.data
     const fromDate = dayStartInTimezone(new Date(`${from}T12:00:00Z`), env.APP_TIMEZONE)
     const toDateExclusive = addDays(dayStartInTimezone(new Date(`${to}T12:00:00Z`), env.APP_TIMEZONE), 1)
 
@@ -88,9 +112,19 @@ export async function dashboardRoutes(app: FastifyInstance, db: Database, env: E
       acc.pausedSeconds += row.pausedSeconds
       byAgent.set(row.agentLogin, acc)
     }
-    const items = [...byAgent.entries()]
-      .map(([agentLogin, acc]) => ({ agentLogin, loggedSeconds: acc.loggedSeconds, pausedSeconds: acc.pausedSeconds }))
+    const names = await loadAgentNames(db, [...byAgent.keys()])
+    const fullItems = [...byAgent.entries()]
+      .map(([agentLogin, acc]) => {
+        const totalSeconds = acc.loggedSeconds + acc.pausedSeconds
+        return {
+          agentLogin, agentName: names.get(agentLogin) ?? null,
+          loggedSeconds: acc.loggedSeconds, pausedSeconds: acc.pausedSeconds,
+          pauseRate: totalSeconds ? acc.pausedSeconds / totalSeconds : 0,
+        }
+      })
+      .filter(r => matchesSearch(q, r.agentLogin, r.agentName))
       .sort((a, b) => b.loggedSeconds - a.loggedSeconds)
-    return { items }
+    const { items, total } = paginate(fullItems, page, pageSize)
+    return { items, total, page, pageSize }
   })
 }
