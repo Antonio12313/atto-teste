@@ -254,6 +254,33 @@ dado pessoal) com os valores agregados nas tabelas; ajuste `api/src/
 collector/extract.ts` e `dates.ts` se algum campo vier em formato diferente
 do assumido.
 
+### Depois disso: rodado de verdade contra a Atto real
+
+Com uma conta Atto real configurada, o coletor foi executado contra o
+servidor de produção da Atto (não um mock) e isso corrigiu mais três coisas:
+
+- **`Accept: application/json` é obrigatório.** O Web Admin (`Campaigns/
+  List`) devolve JSON por padrão, mas o Web Supervision devolve XML a menos
+  que o cliente peça JSON explicitamente — sem esse cabeçalho, `Agents/
+  Report`/`Agents/WorkingTime` pareciam falhar com "resposta inválida".
+- **Resultado vazio é `204 No Content` com corpo vazio, não `200` com `[]`.**
+  O código tentava `JSON.parse('')` nesse caso e classificava como erro;
+  corrigido para tratar corpo vazio como lista vazia (não é falha, é só não
+  haver dados no período).
+- **`Campaigns/OutboundCalls` também precisa do intervalo de 6s entre
+  chamadas**, não só `Agents/*` — com 1s (o padrão anterior de
+  `COLLECT_DELAY_OTHERS_MS`) praticamente toda chamada voltava `429`, mesmo
+  com as tentativas e espera. O padrão passou a ser `6000`, igual a
+  `COLLECT_DELAY_AGENTS_MS`, embora a letra do enunciado só exija isso para
+  `Agents/*`.
+
+Com essas correções, `Campaigns/List` (13 campanhas reais) e os 7 dias de
+`Agents/Report`/`Agents/WorkingTime` passaram a responder `200`/`204`
+consistentemente — sem repetir o erro de before. `Agents/Report`/`Agents/
+WorkingTime` vieram vazios (`204`) para esta conta nos últimos 7 dias — não
+dá para confirmar os nomes de campo contra uma linha real ainda, só a
+mecânica da chamada (ver seção acima para o que ficou sem confirmar).
+
 ## Dashboard
 
 Primeira tela após o login; lê só do banco (nunca chama a Atto). Filtros

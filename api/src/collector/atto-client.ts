@@ -27,7 +27,10 @@ async function get(baseUrl: string, path: string, options: AttoClientOptions): P
     try {
       response = await request(url, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${options.token}` },
+        // WebAdmin defaults to JSON; WebSupervision apparently defaults to
+        // XML unless asked for JSON explicitly (confirmed live: Campaigns/
+        // List parsed fine, Agents/Report didn't until this header was added).
+        headers: { Authorization: `Bearer ${options.token}`, Accept: 'application/json' },
         signal: controller.signal,
       })
     } catch (error) {
@@ -43,7 +46,10 @@ async function get(baseUrl: string, path: string, options: AttoClientOptions): P
       continue
     }
     if (!response.ok) throw new AttoCollectorError(`http-${response.status}`)
-    try { return await response.json() } catch { throw new AttoCollectorError('invalid-json') }
+    // 204 (or any empty body) means "no rows for this query", not an error.
+    const text = await response.text()
+    if (!text.trim()) return []
+    try { return JSON.parse(text) } catch { throw new AttoCollectorError('invalid-json') }
   }
   throw new AttoCollectorError('rate-limited')
 }
