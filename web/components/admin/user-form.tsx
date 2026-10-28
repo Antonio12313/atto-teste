@@ -118,33 +118,32 @@ export function UserForm({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Login</Label>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {initial.user.attoLogin}
-            <Badge variant="outline">{initial.user.isLocal ? "Local" : "Atto"}</Badge>
-          </p>
-        </div>
+      <div className="space-y-2">
+        <Label>Login</Label>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          {initial.user.attoLogin}
+          <Badge variant="outline">{initial.user.isLocal ? "Local" : "Atto"}</Badge>
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="user-name">Nome</Label>
           <Input id="user-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
+        {initial.user.isLocal && (
+          <div className="space-y-2">
+            <Label htmlFor="user-new-password">Nova senha</Label>
+            <Input
+              id="user-new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Deixe em branco para manter a atual"
+            />
+          </div>
+        )}
       </div>
-
-      {initial.user.isLocal && (
-        <div className="space-y-2">
-          <Label htmlFor="user-new-password">Nova senha</Label>
-          <Input
-            id="user-new-password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Deixe em branco para manter a atual"
-            className="max-w-sm"
-          />
-        </div>
-      )}
 
       <label className="flex items-center gap-2 text-sm">
         <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} />
