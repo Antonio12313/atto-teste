@@ -11,9 +11,13 @@ Com Docker e Docker Compose instalados e o Docker em execução, na raiz do
 repositório:
 
 ```sh
-cp .env.example .env   # só na primeira vez; ajuste os valores
+cp .env.example .env   # ajuste os valores — veja "Variáveis de ambiente" abaixo
 docker compose up -d --build
 ```
+
+A API aguarda o banco ficar saudável e aplica as migrations automaticamente
+antes de iniciar; a web e o coletor aguardam a API saudável. O banco é criado
+com nome/usuário/senha do `.env` e persiste no volume `postgres_data`.
 
 | Serviço | Endereço |
 | --- | --- |
@@ -21,18 +25,6 @@ docker compose up -d --build
 | API (Fastify) | http://localhost:3030 |
 | Coletor da Atto | sem porta exposta; roda em loop |
 | PostgreSQL 17 | localhost:5432 |
-
-A API aguarda o banco ficar saudável e aplica as migrations automaticamente
-antes de iniciar; a web e o coletor aguardam a API saudável. O banco é criado
-com nome/usuário/senha do `.env` e persiste no volume `postgres_data`.
-
-```sh
-docker compose ps                 # estado dos serviços
-docker compose logs -f api        # acompanhar logs da API
-docker compose logs -f collector  # acompanhar logs do coletor
-docker compose down               # parar, preservando o banco
-docker compose down -v            # parar e apagar os dados do banco
-```
 
 ## Criando o primeiro administrador
 
@@ -49,27 +41,57 @@ Em outras palavras: para começar, basta logar pela tela com **qualquer**
 conta Atto válida contra o `ATTO_CUSTOMER_SID` configurado — essa conta vira
 a administradora.
 
-## Configurando as credenciais da Atto
+## Variáveis de ambiente
 
-Variáveis em `.env` (veja `.env.example` para o template completo):
+`cp .env.example .env` já traz um valor funcional para cada uma — só
+`ATTO_CUSTOMER_SID` (e `ATTO_LOGIN`/`ATTO_PASSWORD`, se for usar o coletor)
+precisam do dado real da sua conta Atto. A aplicação valida o `.env` inteiro
+no boot (`api/src/config/env.ts`, com `zod`) e recusa subir se faltar alguma
+das obrigatórias abaixo ou se algum valor estiver fora do formato esperado.
 
-| Variável | Uso |
+### Obrigatórias
+
+Sem valor padrão — se faltar qualquer uma, a API não inicia.
+
+| Variável | Para que serve |
 | --- | --- |
-| `ATTO_ADMIN_URL` | Base do Web Admin — `Login/SignIn` e `Campaigns/List` |
-| `ATTO_SUPERVISION_URL` | Base do Web Supervision — usada só pelo coletor |
-| `ATTO_LOGIN` | Opcional. Login da conta de serviço que o coletor usa — não tem relação com quem é administrador (veja a seção abaixo) |
-| `ATTO_PASSWORD` | Opcional. Senha dessa conta; usada pelo coletor para renovar o token quando preciso |
-| `ATTO_CUSTOMER_SID` | **Obrigatório.** Único `CustomerSid` aceito no login — trava de tenant |
-| `ATTO_TOKEN_ENC_KEY` | **Obrigatório.** 32 bytes em base64 para cifrar o token (`openssl rand -base64 32`) |
-| `ATTO_TOKEN_TTL_HOURS` | Validade local assumida do token (padrão `23`) |
-| `ATTO_LOGIN_MIN_INTERVAL_MINUTES` | Intervalo mínimo entre `SignIn`s bem-sucedidos do mesmo login (padrão `60`, mínimo `60`) |
-| `ATTO_REQUEST_TIMEOUT_MS` | Timeout de cada chamada à Atto (padrão `15000`) |
-| `COLLECT_INTERVAL_MINUTES` | Intervalo entre execuções do coletor (padrão `15`) |
-| `COLLECT_BACKFILL_DAYS` | Quantos dias para trás o coletor busca `Agents/Report`/`WorkingTime` (padrão `7`) |
-| `COLLECT_CALLS_LOOKBACK_HOURS` | Janela (em horas) de `OutboundCalls` revisitada a cada execução (padrão `24`) |
-| `COLLECT_DELAY_AGENTS_MS` | Pausa entre chamadas em `Agents/*` (padrão/mínimo `6000`, exigência da Atto) |
-| `COLLECT_DELAY_OTHERS_MS` | Pausa entre as demais chamadas (padrão `1000`) |
-| `APP_TIMEZONE` | Fuso usado para agrupar por dia/hora (padrão `America/Sao_Paulo`) |
+| `NODE_ENV` | `development` ou `production`; em produção exige `COOKIE_SECURE=true` |
+| `API_PORT` | Porta em que a API escuta |
+| `API_HOST` | Host em que a API escuta (`0.0.0.0` no Docker) |
+| `POSTGRES_USER` | Usuário do Postgres (serviço `db` e `DATABASE_URL`) |
+| `POSTGRES_PASSWORD` | Senha do Postgres |
+| `POSTGRES_DB` | Nome do banco |
+| `DATABASE_URL` | String de conexão completa com o Postgres (precisa bater com as três variáveis acima) |
+| `WEB_ORIGIN` | Origem da web, sem caminho (ex.: `http://localhost:3000`) — usada para CORS/cookie |
+| `SESSION_TTL_HOURS` | Validade da sessão local (cookie `HttpOnly`) |
+| `COOKIE_SECURE` | `true`/`false` — exige HTTPS para o cookie de sessão |
+| `LOGIN_RATE_LIMIT_MAX` | Máximo de tentativas de login na janela de `LOGIN_RATE_LIMIT_WINDOW` |
+| `LOGIN_RATE_LIMIT_WINDOW` | Janela do rate limit de login (ex.: `1 minute`) |
+| `API_INTERNAL_URL` | URL da API usada pela web para chamadas servidor-a-servidor (ex.: `http://api:3030` dentro do compose) |
+| `WEB_PORT` | Porta em que a web escuta |
+| `WEB_HOST` | Host em que a web escuta |
+| `DB_PORT` | Porta do Postgres exposta no host |
+| `ATTO_CUSTOMER_SID` | Único `CustomerSid` aceito no login — trava de tenant |
+| `ATTO_TOKEN_ENC_KEY` | 32 bytes em base64 para cifrar o token da Atto (gere com `openssl rand -base64 32`) |
+
+### Opcionais (têm valor padrão)
+
+| Variável | Padrão | Para que serve |
+| --- | --- | --- |
+| `ATTO_ADMIN_URL` | URL pública do Web Admin da Atto | Base do Web Admin — `Login/SignIn` e `Campaigns/List` |
+| `ATTO_SUPERVISION_URL` | URL pública do Web Supervision da Atto | Base do Web Supervision — usada só pelo coletor |
+| `ATTO_LOGIN` | vazio | Login da conta de serviço que o coletor usa — não tem relação com quem é administrador (veja a seção abaixo) |
+| `ATTO_PASSWORD` | vazio | Senha dessa conta; usada pelo coletor para renovar o token quando preciso |
+| `ATTO_TOKEN_TTL_HOURS` | `23` | Validade local assumida do token |
+| `ATTO_LOGIN_MIN_INTERVAL_MINUTES` | `60` | Intervalo mínimo entre `SignIn`s bem-sucedidos do mesmo login (mínimo `60`, exigência da Atto) |
+| `ATTO_REQUEST_TIMEOUT_MS` | `15000` | Timeout de cada chamada à Atto |
+| `COLLECT_INTERVAL_MINUTES` | `15` | Intervalo entre execuções do coletor |
+| `COLLECT_BACKFILL_DAYS` | `7` | Quantos dias para trás o coletor busca `Agents/Report`/`WorkingTime` |
+| `COLLECT_CALLS_LOOKBACK_HOURS` | `24` | Janela (em horas) de `OutboundCalls` revisitada a cada execução |
+| `COLLECT_DELAY_AGENTS_MS` | `6000` | Pausa entre chamadas em `Agents/*` (mínimo `6000`, exigência da Atto) |
+| `COLLECT_DELAY_OTHERS_MS` | `6000` | Pausa entre as demais chamadas de `Campaigns/*`/`Agents/List` |
+| `COLLECT_DELAY_CALLS_MS` | `15000` | Pausa entre chamadas (e páginas) de `Campaigns/OutboundCalls` — mais alta que as demais porque esse endpoint se mostrou mais sensível a rate limit (mínimo `15000`) |
+| `APP_TIMEZONE` | `America/Sao_Paulo` | Fuso usado para agrupar por dia/hora |
 
 `ATTO_LOGIN`/`ATTO_CUSTOMER_SID`/`ATTO_TOKEN_ENC_KEY` só aceitam valores
 fictícios no `.env.example` versionado — nunca um login, `CustomerSid` ou
@@ -199,10 +221,25 @@ Em erro de limite (`429`) numa chamada avulsa, espera e repete com um número
 limitado de tentativas antes de desistir dessa chamada específica.
 
 Tabelas gravadas (upsert idempotente por chave natural):
-`atto_campaigns`, `atto_agent_report` (por dia + agente), `atto_working_time`
-(por sessão de login), `atto_calls_hourly` (por hora + campanha, com `final`),
-e `atto_collect_runs` (uma linha por execução: status, contagens, erro
-sanitizado).
+`atto_campaigns`, `atto_agents`, `atto_agent_report` (por dia + agente),
+`atto_working_time` (por sessão de login), `atto_calls_hourly` (por hora +
+campanha, com `final`), e `atto_collect_runs` (uma linha por execução:
+status, contagens, erro sanitizado). `atto_campaigns` grava a resposta de
+`Campaigns/List` inteira (confirmado contra uma resposta real 2026-10-28) —
+todos os ~38 campos (fila, IVR, gravação, prioridade, Sids internos etc.),
+não só `sid`/`name`; é configuração de campanha/telefonia, não dado de
+cliente, então não entra na regra de dados pessoais.
+
+`atto_agents` grava a resposta de `Agents/List` (também confirmado ao vivo
+2026-10-28; chave natural é `Login`) — **com uma exceção deliberada**: a
+resposta real traz um campo `Password` (um hash de credencial da própria
+Atto) que nunca é lido nem gravado. Não há razão para este app guardar a
+credencial de outro sistema, mesmo em hash; o resto da linha (nome, grupo,
+campanhas atribuídas, configuração de workspace etc.) é gravado por
+completo. `Agents/List` vive no serviço **Admin** (confirmado contra a
+página `.help`, sem autenticação, de cada serviço), não no Supervision —
+apesar do prefixo "Agents/" combinar com `Agents/Report`/`Agents/
+WorkingTime`, que são do Supervision.
 
 Logs estruturados em JSON, um por chamada (`collect_call`: endpoint, status,
 duração) e um resumo por execução (`collect_summary`); nunca token, nunca
@@ -281,6 +318,58 @@ WorkingTime` vieram vazios (`204`) para esta conta nos últimos 7 dias — não
 dá para confirmar os nomes de campo contra uma linha real ainda, só a
 mecânica da chamada (ver seção acima para o que ficou sem confirmar).
 
+### Correções contra a documentação oficial (Postman) da Atto
+
+O Eduardo passou a documentação Postman real de `Agents/Report`, `Agents/
+WorkingTime` e `Campaigns/OutboundCalls`, incluindo um exemplo de resposta
+real de `OutboundCalls`. Comparando com o que estava implementado:
+
+- **Bug real, provável causa dos `timeout` em `OutboundCalls`:** `MomentStart`/
+  `MomentEnd` eram enviados no formato `/Date(1750000000000)/` (formato WCF
+  usado para *interpretar* respostas, não para montar requisições). O
+  formato documentado — confirmado nos exemplos do Postman — é
+  `"YYYY-MM-DD HH:MM:SS"`, sem fuso. `Agents/Report`/`Agents/WorkingTime`
+  "funcionavam" mesmo com o formato errado só porque essa conta não tem
+  atividade de agente nenhuma no período (vazio de qualquer forma, com ou
+  sem filtro funcionando); `OutboundCalls` tem dados reais, então um filtro
+  de data inválido plausivelmente faz a Atto cair num caminho mais caro
+  (ou sem filtro nenhum) no backend — consistente com o `timeout` de 15s
+  observado. Corrigido: `formatAttoDate(date, timeZone)` agora monta esse
+  formato (`api/src/collector/dates.ts`).
+- **`MomentStart`/`MomentEnd` trocados por `MomentEndedCall_From`/
+  `MomentEndedCall_To`** em `OutboundCalls`, por recomendação explícita da
+  própria documentação: filtrar pelo momento de *início* da discagem pode
+  trazer chamadas ainda em andamento; filtrar pelo momento de *término*
+  evita isso — e evita também "congelar" uma janela horária como `final`
+  antes de uma chamada que começou nela ter realmente terminado.
+- **Paginação por `Seq`:** a documentação descreve paginação explícita
+  (reenviar `Seq=<valor da última linha>` para pegar a página seguinte).
+  Não implementado antes — corrigido com um loop em `fetchOutboundCalls`
+  (até 50 páginas, parada em página vazia). A única resposta real de
+  exemplo que temos não tem o campo `Seq` (só `Indice`), então o código lê
+  os dois defensivamente; não foi possível confirmar qual nome é o certo
+  sem uma janela com mais de uma página de dados.
+- **`CallDuration` (número puro, segundos), não `ConvDuration`:** o campo
+  usado para o tempo de conversa estava com o nome errado — `ConvDuration`
+  não existe na resposta real, então a duração sempre vinha `0`. Corrigido
+  para ler `CallDuration`.
+- **`DialMoment` vem como `"DD/MM/YYYY HH:MM:SS"`**, não `/Date(...)/ `. O
+  parser anterior caía no fallback `new Date(string)`, que assume
+  `MM/DD` e teria interpretado datas erradas (ou rejeitado silenciosamente
+  dias > 12). Corrigido com um parser explícito desse formato.
+
+**Ainda não resolvido, e não é mais um problema de código:** depois de todas
+essas correções, uma chamada isolada e controlada a `OutboundCalls` (fora do
+loop do coletor, só para confirmar) ainda voltou `timeout` e depois
+`rate-limited` — o mesmo padrão de antes. Isso indica que a conta/token
+ainda está sob um bloqueio/cooldown do lado da Atto específico para esse
+endpoint, provavelmente resultado do volume de tentativas durante os testes
+anteriores desta sessão (centenas de chamadas em ~30min). Não dá para
+resolver isso com mais código — só esperar o cooldown da Atto passar. O
+coletor foi deixado **parado** (`docker compose stop collector`) para não
+continuar martelando o endpoint; `Campaigns/List` e `Agents/*` continuam
+funcionando normalmente.
+
 ## Dashboard
 
 Primeira tela após o login; lê só do banco (nunca chama a Atto). Filtros
@@ -292,8 +381,14 @@ então nada depende só do front.
 | Bloco | Nó | Métricas | Como é calculado |
 | --- | --- | --- | --- |
 | Chamadas | `dashboard.atto.chamadas` | Tentativas, atendidas, taxa de atendimento, gráfico de atendidas por hora do dia | Soma de `attempts`/`answered`/`talk_seconds` de `atto_calls_hourly` no período (e campanha, se filtrado); taxa = atendidas/tentativas; gráfico agrupa por hora do dia (`APP_TIMEZONE`), somando todos os dias do período na mesma hora |
-| Agentes | `dashboard.atto.agentes` | Ranking por atendimentos e tempo médio de conversação | Soma `answered_calls`/`talk_seconds` de `atto_agent_report` por agente no período; média = soma do tempo / atendimentos. Não filtra por campanha (a Atto não devolve esse campo nesse endpoint) |
-| Tempo logado e pausas | `dashboard.atto.tempo` | Tempo logado e em pausa por agente (tabela) | Soma `logged_seconds`/`paused_seconds` de `atto_working_time` por agente no período (e campanha, se filtrado) |
+| Agentes | `dashboard.atto.agentes` | Ranking por atendimentos e tempo médio de conversação, com nome do agente | Soma `answered_calls`/`talk_seconds` de `atto_agent_report` por agente no período; média = soma do tempo / atendimentos; nome vem de `atto_agents` (coletado por `Agents/List`), por `agent_login`. Não filtra por campanha (a Atto não devolve esse campo nesse endpoint) |
+| Tempo logado e pausas | `dashboard.atto.tempo` | Tempo logado, em pausa e % em pausa por agente (tabela), com nome | Soma `logged_seconds`/`paused_seconds` de `atto_working_time` por agente no período (e campanha, se filtrado); % em pausa = pausado / (logado + pausado) |
+
+Os blocos de Agentes e Tempo são paginados (20 por página) e têm busca por
+nome ou login — necessário porque a conta real tem centenas de agentes
+cadastrados (`atto_agents`), e sem paginação a tabela ficaria impraticável.
+Página/busca ficam na própria URL (`agentesPage`/`agentesQ`,
+`tempoPage`/`tempoQ`), mesmo padrão dos outros filtros.
 
 "Atendida" segue a regra do teste: é a linha de `OutboundCalls` que tem
 `CallHistorySid` preenchido; as demais são tentativas sem atendimento.
