@@ -2,8 +2,11 @@
 import { useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -18,6 +21,12 @@ function localISODate(date: Date): string {
   const d = String(date.getDate()).padStart(2, "0")
   return `${y}-${m}-${d}`
 }
+
+const SHORTCUTS = [
+  { label: "Hoje", days: 1 },
+  { label: "7 dias", days: 7 },
+  { label: "30 dias", days: 30 },
+]
 
 export function DashboardFilters({
   from,
@@ -34,6 +43,7 @@ export function DashboardFilters({
   const pathname = usePathname()
   const [fromValue, setFromValue] = useState(from)
   const [toValue, setToValue] = useState(to)
+  const [activeShortcut, setActiveShortcut] = useState<number | null>(null)
 
   function apply(next: { from?: string; to?: string; campaignId?: string }) {
     const nextFrom = next.from ?? fromValue
@@ -51,6 +61,7 @@ export function DashboardFilters({
     const nextTo = localISODate(end)
     setFromValue(nextFrom)
     setToValue(nextTo)
+    setActiveShortcut(days)
     apply({ from: nextFrom, to: nextTo })
   }
 
@@ -59,60 +70,80 @@ export function DashboardFilters({
     value === "all" ? "Todas" : campaigns.find((c) => c.id === value)?.name ?? value
 
   return (
-    <div className="flex flex-wrap items-end gap-4">
-      <div className="space-y-2">
-        <Label htmlFor="dashboard-from">De</Label>
-        <Input
-          id="dashboard-from"
-          type="date"
-          value={fromValue}
-          onChange={(e) => setFromValue(e.target.value)}
-          className="w-40"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="dashboard-to">Até</Label>
-        <Input
-          id="dashboard-to"
-          type="date"
-          value={toValue}
-          onChange={(e) => setToValue(e.target.value)}
-          className="w-40"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Campanha</Label>
-        <Select
-          value={campaignValue}
-          onValueChange={(value) => apply({ campaignId: !value || value === "all" ? "" : value })}
-        >
-          <SelectTrigger className="w-48">
-            <SelectValue>{campaignLabel}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {campaigns.map((campaign) => (
-              <SelectItem key={campaign.id} value={campaign.id}>
-                {campaign.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => shortcut(1)}>
-          Hoje
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => shortcut(7)}>
-          7 dias
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => shortcut(30)}>
-          30 dias
-        </Button>
-        <Button type="button" size="sm" onClick={() => apply({})}>
+    <Card>
+      <CardContent className="flex flex-wrap items-end gap-4">
+        <div className="flex items-end gap-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="dashboard-from" className="text-xs text-muted-foreground">
+              De
+            </Label>
+            <Input
+              id="dashboard-from"
+              type="date"
+              value={fromValue}
+              onChange={(e) => {
+                setFromValue(e.target.value)
+                setActiveShortcut(null)
+              }}
+              className="w-[9.5rem]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dashboard-to" className="text-xs text-muted-foreground">
+              Até
+            </Label>
+            <Input
+              id="dashboard-to"
+              type="date"
+              value={toValue}
+              onChange={(e) => {
+                setToValue(e.target.value)
+                setActiveShortcut(null)
+              }}
+              className="w-[9.5rem]"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Campanha</Label>
+          <Select
+            value={campaignValue}
+            onValueChange={(value) => apply({ campaignId: !value || value === "all" ? "" : value })}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue>{campaignLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {campaigns.map((campaign) => (
+                <SelectItem key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Separator orientation="vertical" className="hidden h-8 sm:block" />
+
+        <ButtonGroup>
+          {SHORTCUTS.map((s) => (
+            <Button
+              key={s.days}
+              type="button"
+              variant={activeShortcut === s.days ? "default" : "outline"}
+              onClick={() => shortcut(s.days)}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </ButtonGroup>
+
+        <Button type="button" className="ml-auto" onClick={() => apply({})}>
           Aplicar
         </Button>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

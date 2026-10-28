@@ -75,7 +75,7 @@ function TreeItem({
   return (
     <li>
       <div
-        className="flex flex-wrap items-center gap-2 rounded-md py-1"
+        className="flex flex-wrap items-center gap-2 rounded-md py-1.5 pr-2 hover:bg-muted/50"
         style={{ paddingLeft: depth * 24 }}
       >
         {hasChildren ? (
@@ -83,7 +83,7 @@ function TreeItem({
             type="button"
             onClick={() => setOpen(!open)}
             aria-label={open ? "Recolher" : "Expandir"}
-            className="text-muted-foreground"
+            className="shrink-0 text-muted-foreground"
           >
             {open ? (
               <ChevronDown className="size-4" />
@@ -92,11 +92,11 @@ function TreeItem({
             )}
           </button>
         ) : (
-          <span className="inline-block size-4" />
+          <span className="inline-block size-4 shrink-0" />
         )}
         {renderControl(node)}
         <span className="text-sm">{node.label}</span>
-        {renderExtra?.(node)}
+        {renderExtra && <span className="ml-auto flex items-center gap-2">{renderExtra(node)}</span>}
       </div>
       {hasChildren && open && (
         <ul>

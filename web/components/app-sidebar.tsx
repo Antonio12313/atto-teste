@@ -1,7 +1,15 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, LockKeyhole, ShieldCheck, Users } from "lucide-react"
+import {
+  ChevronsUpDown,
+  LayoutDashboard,
+  LoaderCircle,
+  LockKeyhole,
+  LogOut,
+  ShieldCheck,
+  Users,
+} from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +23,16 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { LogoutButton } from "@/components/logout-button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useLogout } from "@/components/logout-button"
 
 const MAIN_ITEMS = [{ href: "/dashboard", label: "Dashboard", node: "dashboard", icon: LayoutDashboard }]
 const ADMIN_ITEMS = [
@@ -28,6 +45,14 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1]![0] : "")).toUpperCase()
 }
 
+/** True if `permissions` grants `node` itself or any node under it — a role
+ * can grant just a leaf (e.g. "dashboard.atto.chamadas") without also
+ * granting its parents, so a nav link keyed on a parent node must match on
+ * prefix, not just an exact entry. */
+function hasAccess(permissions: string[], node: string): boolean {
+  return permissions.some((p) => p === node || p.startsWith(`${node}.`))
+}
+
 export function AppSidebar({
   name,
   attoLogin,
@@ -38,8 +63,9 @@ export function AppSidebar({
   permissions: string[]
 }) {
   const pathname = usePathname()
-  const mainItems = MAIN_ITEMS.filter((item) => permissions.includes(item.node))
-  const adminItems = ADMIN_ITEMS.filter((item) => permissions.includes(item.node))
+  const mainItems = MAIN_ITEMS.filter((item) => hasAccess(permissions, item.node))
+  const adminItems = ADMIN_ITEMS.filter((item) => hasAccess(permissions, item.node))
+  const { logout, loading } = useLogout()
 
   return (
     <Sidebar>
@@ -96,16 +122,43 @@ export function AppSidebar({
         )}
       </SidebarContent>
       <SidebarFooter>
-        <div className="flex items-center gap-2 overflow-hidden px-2 py-1.5">
-          <Avatar className="size-7 shrink-0">
-            <AvatarFallback className="text-xs">{initials(name)}</AvatarFallback>
-          </Avatar>
-          <div className="flex min-w-0 flex-col text-xs">
-            <span className="truncate font-medium">{name}</span>
-            <span className="truncate text-muted-foreground">{attoLogin}</span>
-          </div>
-        </div>
-        <LogoutButton />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[popup-open]:bg-sidebar-accent data-[popup-open]:text-sidebar-accent-foreground"
+                render={
+                  <DropdownMenuTrigger>
+                    <Avatar className="size-7 shrink-0">
+                      <AvatarFallback className="text-xs">{initials(name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex min-w-0 flex-col text-xs">
+                      <span className="truncate font-medium">{name}</span>
+                      <span className="truncate text-muted-foreground">{attoLogin}</span>
+                    </div>
+                    <ChevronsUpDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                  </DropdownMenuTrigger>
+                }
+              />
+              <DropdownMenuContent side="top" align="end" sideOffset={4} className="min-w-56">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium">{name}</span>
+                      <span className="truncate text-muted-foreground">{attoLogin}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={loading} onClick={logout} variant="destructive">
+                  {loading ? <LoaderCircle className="animate-spin" /> : <LogOut />}
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   )

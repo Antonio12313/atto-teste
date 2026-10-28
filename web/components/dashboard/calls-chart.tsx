@@ -18,7 +18,7 @@ export function CallsByHourChart({ data }: { data: Array<{ hour: number; answere
           axisLine={false}
         />
         <ChartTooltip content={<ChartTooltipContent labelFormatter={(hour) => `${hour}h`} />} />
-        <Bar dataKey="answered" fill="var(--color-answered)" radius={4} />
+        <Bar dataKey="answered" fill="var(--color-answered)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ChartContainer>
   )

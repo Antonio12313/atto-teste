@@ -3,7 +3,8 @@ import { useState } from "react"
 import { LogOut, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { api, ApiError } from "@/lib/api"
-export function LogoutButton() {
+
+export function useLogout() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   async function logout() {
@@ -21,6 +22,11 @@ export function LogoutButton() {
       setLoading(false)
     }
   }
+  return { logout, loading, error }
+}
+
+export function LogoutButton() {
+  const { logout, loading, error } = useLogout()
   return (
     <div className="space-y-2">
       <Button variant="outline" disabled={loading} onClick={logout}>
