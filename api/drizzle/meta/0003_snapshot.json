@@ -1,0 +1,1175 @@
+{
+  "id": "9c0ada1b-3949-4e33-9073-ccab7c0bd1bb",
+  "prevId": "46f9969b-f2f5-4d52-872a-a7928cae5315",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.atto_agent_report": {
+      "name": "atto_agent_report",
+      "schema": "",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_login": {
+          "name": "agent_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_sid": {
+          "name": "campaign_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "answered_calls": {
+          "name": "answered_calls",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "talk_seconds": {
+          "name": "talk_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "atto_agent_report_day_agent_login_campaign_sid_pk": {
+          "name": "atto_agent_report_day_agent_login_campaign_sid_pk",
+          "columns": [
+            "day",
+            "agent_login",
+            "campaign_sid"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_agents": {
+      "name": "atto_agents",
+      "schema": "",
+      "columns": {
+        "login": {
+          "name": "login",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "surname": {
+          "name": "surname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_sid": {
+          "name": "customer_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "already_logged": {
+          "name": "already_logged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "block": {
+          "name": "block",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chat_campaigns": {
+          "name": "chat_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dial_mode_enable": {
+          "name": "dial_mode_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dial_mode_time": {
+          "name": "dial_mode_time",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distributor_sid": {
+          "name": "distributor_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "employee_code": {
+          "name": "employee_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender": {
+          "name": "gender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "group_sid": {
+          "name": "group_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holiday_sid": {
+          "name": "holiday_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inb_campaigns": {
+          "name": "inb_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interactions_number": {
+          "name": "interactions_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mail_campaigns": {
+          "name": "mail_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manual_campaigns": {
+          "name": "manual_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "media_campaigns": {
+          "name": "media_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_sid": {
+          "name": "opening_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "out_campaigns": {
+          "name": "out_campaigns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pause_sid": {
+          "name": "pause_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ready_enable": {
+          "name": "ready_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shift": {
+          "name": "shift",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supervisor_sid": {
+          "name": "supervisor_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "without_headset": {
+          "name": "without_headset",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_space_height": {
+          "name": "work_space_height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_space_name": {
+          "name": "work_space_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_space_sid": {
+          "name": "work_space_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_space_width": {
+          "name": "work_space_width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wrapup_enable": {
+          "name": "wrapup_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wrapup_extended": {
+          "name": "wrapup_extended",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wrapup_time": {
+          "name": "wrapup_time",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_calls_hourly": {
+      "name": "atto_calls_hourly",
+      "schema": "",
+      "columns": {
+        "hour_start": {
+          "name": "hour_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_sid": {
+          "name": "campaign_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "answered": {
+          "name": "answered",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "talk_seconds": {
+          "name": "talk_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "final": {
+          "name": "final",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "atto_calls_hourly_hour_start_campaign_sid_pk": {
+          "name": "atto_calls_hourly_hour_start_campaign_sid_pk",
+          "columns": [
+            "hour_start",
+            "campaign_sid"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_campaigns": {
+      "name": "atto_campaigns",
+      "schema": "",
+      "columns": {
+        "sid": {
+          "name": "sid",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_sid": {
+          "name": "customer_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_line_sid": {
+          "name": "access_line_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_msg": {
+          "name": "agent_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aggressiveness": {
+          "name": "aggressiveness",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "black_list_sid": {
+          "name": "black_list_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_classify": {
+          "name": "call_classify",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_classify_level": {
+          "name": "call_classify_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_file_sid": {
+          "name": "call_file_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dial_rule_sid": {
+          "name": "dial_rule_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dial_type": {
+          "name": "dial_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dialer_status": {
+          "name": "dialer_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_phone": {
+          "name": "display_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_type": {
+          "name": "display_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "factor_d": {
+          "name": "factor_d",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gateway_sid": {
+          "name": "gateway_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grammar_sid": {
+          "name": "grammar_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hold_msg": {
+          "name": "hold_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holiday_sid": {
+          "name": "holiday_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ivr_name": {
+          "name": "ivr_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ivr_sid": {
+          "name": "ivr_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_channels": {
+          "name": "max_channels",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_pending_calls": {
+          "name": "max_pending_calls",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "no_agent_msg": {
+          "name": "no_agent_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_sid": {
+          "name": "opening_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "play_wave_msg": {
+          "name": "play_wave_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "queue": {
+          "name": "queue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "record": {
+          "name": "record",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "record_file_template": {
+          "name": "record_file_template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "record_folder": {
+          "name": "record_folder",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retention": {
+          "name": "retention",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "script_name": {
+          "name": "script_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "script_sid": {
+          "name": "script_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_sid": {
+          "name": "status_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wait_msg": {
+          "name": "wait_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wait_time_msg": {
+          "name": "wait_time_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "welcome_msg": {
+          "name": "welcome_msg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_collect_runs": {
+      "name": "atto_collect_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trigger": {
+          "name": "trigger",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "records": {
+          "name": "records",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_working_time": {
+      "name": "atto_working_time",
+      "schema": "",
+      "columns": {
+        "session_key": {
+          "name": "session_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "agent_login": {
+          "name": "agent_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_sid": {
+          "name": "campaign_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "login_at": {
+          "name": "login_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logout_at": {
+          "name": "logout_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logged_seconds": {
+          "name": "logged_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "paused_seconds": {
+          "name": "paused_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.role_permissions": {
+      "name": "role_permissions",
+      "schema": "",
+      "columns": {
+        "role_id": {
+          "name": "role_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "node": {
+          "name": "node",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "role_permissions_role_id_roles_id_fk": {
+          "name": "role_permissions_role_id_roles_id_fk",
+          "tableFrom": "role_permissions",
+          "tableTo": "roles",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "role_permissions_role_id_node_pk": {
+          "name": "role_permissions_role_id_node_pk",
+          "columns": [
+            "role_id",
+            "node"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.roles": {
+      "name": "roles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "roles_name_unique": {
+          "name": "roles_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_hash_unique": {
+          "name": "sessions_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_permissions": {
+      "name": "user_permissions",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "node": {
+          "name": "node",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "effect": {
+          "name": "effect",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_permissions_user_id_users_id_fk": {
+          "name": "user_permissions_user_id_users_id_fk",
+          "tableFrom": "user_permissions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_permissions_user_id_node_pk": {
+          "name": "user_permissions_user_id_node_pk",
+          "columns": [
+            "user_id",
+            "node"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_roles": {
+      "name": "user_roles",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_roles_user_id_users_id_fk": {
+          "name": "user_roles_user_id_users_id_fk",
+          "tableFrom": "user_roles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_roles_role_id_roles_id_fk": {
+          "name": "user_roles_role_id_roles_id_fk",
+          "tableFrom": "user_roles",
+          "tableTo": "roles",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_roles_user_id_role_id_pk": {
+          "name": "user_roles_user_id_role_id_pk",
+          "columns": [
+            "user_id",
+            "role_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "atto_login": {
+          "name": "atto_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atto_login_normalized": {
+          "name": "atto_login_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_local": {
+          "name": "is_local",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "atto_sid": {
+          "name": "atto_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customer_sid": {
+          "name": "customer_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_root": {
+          "name": "is_root",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "atto_roles": {
+          "name": "atto_roles",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_encrypted": {
+          "name": "token_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_obtained_at": {
+          "name": "token_obtained_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_expires_at": {
+          "name": "token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_invalidated_at": {
+          "name": "token_invalidated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_signin_at": {
+          "name": "last_signin_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_atto_login_normalized_unique": {
+          "name": "users_atto_login_normalized_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "atto_login_normalized"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "users_atto_login_normalized": {
+          "name": "users_atto_login_normalized",
+          "value": "\"users\".\"atto_login_normalized\" = lower(btrim(\"users\".\"atto_login\"))"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

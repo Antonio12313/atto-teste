@@ -1,19 +1,43 @@
 // No date library: Intl.DateTimeFormat (built into Node) is enough for the
 // timezone math this collector needs, so adding one wasn't justified.
 
-/** WCF/.svc services often encode dates as "/Date(1570223240000)/". */
-export function parseAttoDate(value: unknown): Date | null {
+/**
+ * Atto's own services, confirmed live against a real Campaigns/OutboundCalls
+ * response (DialMoment): "DD/MM/YYYY HH:MM:SS", not WCF's "/Date(...)/ ".
+ * Parse that explicitly — never hand it to `new Date(string)`, which assumes
+ * MM/DD and silently mis-parses or rejects it. `/Date(...)/ ` is kept as a
+ * fallback in case some other field still uses the WCF wire format.
+ */
+export function parseAttoDate(value: unknown, timeZone: string): Date | null {
   if (typeof value === 'string') {
     const wcf = /^\/Date\((-?\d+)\)\/$/.exec(value)
     if (wcf) return new Date(Number(wcf[1]))
+    const br = /^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(value)
+    if (br) {
+      const [, day, month, year, hour = '00', minute = '00', second = '00'] = br
+      const naiveUtc = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second))
+      return new Date(naiveUtc - offsetMsAt(new Date(naiveUtc), timeZone))
+    }
     const parsed = new Date(value)
     if (!isNaN(parsed.getTime())) return parsed
   }
   if (typeof value === 'number') return new Date(value)
   return null
 }
-export function formatAttoDate(date: Date): string {
-  return `/Date(${date.getTime()})/`
+
+/**
+ * Atto's documented request format for MomentStart/MomentEnd (and friends
+ * like MomentEndedCall_From/_To): "YYYY-MM-DD HH:MM:SS", local time, no
+ * timezone marker. Confirmed against Atto's own published Postman examples
+ * (Agents/Report, Agents/WorkingTime, Campaigns/OutboundCalls) — previously
+ * this sent WCF's "/Date(...)/ ", which Atto's services don't parse as a
+ * date and likely explains the timeouts on OutboundCalls (falls back to an
+ * unfiltered/expensive query instead of erroring).
+ */
+export function formatAttoDate(date: Date, timeZone: string): string {
+  const p = partsOf(date, timeZone)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}:${pad(p.second)}`
 }
 
 function partsOf(date: Date, timeZone: string) {

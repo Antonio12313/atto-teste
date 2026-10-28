@@ -15,6 +15,20 @@
       "when": 1793154375613,
       "tag": "0001_known_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793188026379,
+      "tag": "0002_condemned_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793188558599,
+      "tag": "0003_rainy_abomination",
+      "breakpoints": true
     }
   ]
 }

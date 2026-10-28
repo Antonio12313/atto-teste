@@ -34,10 +34,12 @@ export const envSchema = z.object({
   COLLECT_CALLS_LOOKBACK_HOURS: positive.default(24),
   // Atto rate-limits Agents/* to one call every 6s minimum; enforce the floor here too.
   COLLECT_DELAY_AGENTS_MS: positive.min(6000).default(6000),
-  // Confirmed live: Campaigns/OutboundCalls 429s almost every time at 1s between
-  // calls (even with retries), so it needs the same floor as Agents/* in practice,
-  // despite the spec only naming Agents/* explicitly.
   COLLECT_DELAY_OTHERS_MS: positive.default(6000),
+  // Confirmed live: Campaigns/OutboundCalls keeps 429ing even at 6s spacing
+  // (the Agents/* floor) — it needs a longer gap than every other endpoint.
+  // Unconfirmed exact threshold; 15s is a conservative starting point pending
+  // a controlled retest.
+  COLLECT_DELAY_CALLS_MS: positive.min(15000).default(15000),
   APP_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
 }).superRefine((env, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
