@@ -22,10 +22,9 @@ docker compose up -d --build
 | Coletor da Atto | sem porta exposta; roda em loop |
 | PostgreSQL 17 | localhost:5432 |
 
-A API aguarda o banco ficar saudável, aplica as migrations e roda o seed
-automaticamente antes de iniciar (`migrate.js && seed.js && server.js`); a web
-e o coletor aguardam a API saudável. O banco é criado com nome/usuário/senha
-do `.env` e persiste no volume `postgres_data`.
+A API aguarda o banco ficar saudável e aplica as migrations automaticamente
+antes de iniciar; a web e o coletor aguardam a API saudável. O banco é criado
+com nome/usuário/senha do `.env` e persiste no volume `postgres_data`.
 
 ```sh
 docker compose ps                 # estado dos serviços
@@ -37,22 +36,18 @@ docker compose down -v            # parar e apagar os dados do banco
 
 ## Criando o primeiro administrador
 
-Um usuário aqui sempre espelha uma conta real na Atto — não há como fabricar
-uma localmente — então o seed (`api/src/scripts/seed.ts`, roda automaticamente
-no boot da API, idempotente, **nunca chama a Atto**) só:
+**Não há seed nem usuário de exemplo.** Um usuário aqui sempre espelha uma
+conta real na Atto, então o primeiro administrador nasce do primeiro login
+bem-sucedido que qualquer pessoa fizer num banco vazio: se `users` está vazia
+no momento em que o login é criado, esse usuário recebe automaticamente o
+perfil **Administrador** com a árvore inteira liberada (ver
+`grantFullAccess` em `api/src/modules/auth/login.ts`). Logins seguintes não
+ganham nada automaticamente — nascem sem nenhuma permissão, como o resto do
+RBAC exige, e dependem desse primeiro administrador para serem liberados.
 
-1. garante que os três perfis fixos existam (`Administrador`, `Supervisor`,
-   `Consultor` — veja a árvore abaixo);
-2. garante a linha do usuário cujo login é `ATTO_LOGIN` (criando-a vazia, sem
-   senha nem token, se ainda não existir — exatamente como nasceria no
-   primeiro login real);
-3. dá a esse usuário o perfil **Administrador**.
-
-Sem isso, ninguém teria `admin.usuarios`/`admin.perfis` para conceder
-permissão a qualquer pessoa (usuário novo nasce sem nenhuma). Configure
-`ATTO_LOGIN` com o login da Atto de quem deve ser o primeiro administrador;
-o primeiro login real dessa pessoa (pela tela ou `POST /auth/login`) completa
-o cadastro com os dados que a Atto devolver (nome, `Sid`, `ROOT`, `Roles`).
+Em outras palavras: para começar, basta logar pela tela com **qualquer**
+conta Atto válida contra o `ATTO_CUSTOMER_SID` configurado — essa conta vira
+a administradora.
 
 ## Configurando as credenciais da Atto
 
@@ -62,8 +57,8 @@ Variáveis em `.env` (veja `.env.example` para o template completo):
 | --- | --- |
 | `ATTO_ADMIN_URL` | Base do Web Admin — `Login/SignIn` e `Campaigns/List` |
 | `ATTO_SUPERVISION_URL` | Base do Web Supervision — usada só pelo coletor |
-| `ATTO_LOGIN` | Login da conta Atto que é o primeiro administrador **e** a conta de serviço do coletor |
-| `ATTO_PASSWORD` | Senha dessa conta; usada pelo coletor para renovar o token quando preciso |
+| `ATTO_LOGIN` | Opcional. Login da conta de serviço que o coletor usa — não tem relação com quem é administrador (veja a seção abaixo) |
+| `ATTO_PASSWORD` | Opcional. Senha dessa conta; usada pelo coletor para renovar o token quando preciso |
 | `ATTO_CUSTOMER_SID` | **Obrigatório.** Único `CustomerSid` aceito no login — trava de tenant |
 | `ATTO_TOKEN_ENC_KEY` | **Obrigatório.** 32 bytes em base64 para cifrar o token (`openssl rand -base64 32`) |
 | `ATTO_TOKEN_TTL_HOURS` | Validade local assumida do token (padrão `23`) |
@@ -77,8 +72,11 @@ Variáveis em `.env` (veja `.env.example` para o template completo):
 | `APP_TIMEZONE` | Fuso usado para agrupar por dia/hora (padrão `America/Sao_Paulo`) |
 
 `ATTO_LOGIN`/`ATTO_CUSTOMER_SID`/`ATTO_TOKEN_ENC_KEY` só aceitam valores
-fictícios neste repositório — nunca um login, `CustomerSid` ou token reais da
-Atto em código, `.env.example`, commit, log ou print.
+fictícios no `.env.example` versionado — nunca um login, `CustomerSid` ou
+token reais da Atto em código, commit, log ou print. O `.env` local (fora do
+Git) é o único lugar onde `ATTO_CUSTOMER_SID` precisa do valor real do
+cliente, e `ATTO_LOGIN`/`ATTO_PASSWORD` do valor real da conta de serviço do
+coletor, quando for usá-lo.
 
 ## Como o login funciona
 
@@ -99,10 +97,21 @@ autentica por `Login`/`Password`). Resumo do fluxo:
 4. `Error` preenchido ou credencial recusada → `401` genérico, nada é
    gravado. Erro de rede/timeout/5xx → `503`. A própria Atto respondendo
    `429` → `429` com `Retry-After`, e o cooldown é registrado.
-5. Sucesso: se o `CustomerSid` devolvido não é o configurado, a resposta é
-   descartada inteira e o login falha com `401` genérico (só entra quem é
-   deste cliente). Caso bata, o usuário local é criado/atualizado com os
-   dados da Atto, o hash argon2id da senha e o token cifrado (AES-256-GCM).
+5. Sucesso estrutural (`Error` nulo, `jwt` presente) **sempre** grava o
+   usuário local — hash argon2id da senha e token cifrado (AES-256-GCM) —
+   mesmo que o passo 6 abaixo rejeite a sessão. A Atto só permite um
+   `SignIn` por hora: se essa gravação fosse condicional ao passo 6, uma
+   rejeição por `CustomerSid` perderia esse `SignIn` sem poder tentar de
+   novo por uma hora, mesmo a credencial estando certa. Se o usuário já
+   existe (login repetido ou senha trocada), os dados são atualizados.
+6. Só então o `CustomerSid` devolvido é comparado ao configurado; se
+   diferente, a sessão é negada (`401` genérico) — mas o que foi salvo no
+   passo 5 continua lá, então uma nova tentativa com a mesma senha resolve
+   **localmente** (sem gastar outro `SignIn`) e continua negada da mesma
+   forma, até o `ATTO_CUSTOMER_SID` do `.env` ser corrigido para o tenant
+   certo (dá pra confirmar o valor certo consultando `customer_sid` na
+   linha criada em `users`, já que ele é salvo mesmo quando a sessão é
+   negada).
 
 A sessão local (cookie `HttpOnly`, opaca, guardada em `sessions`) é sempre
 local: logout e login repetidos nunca chamam a Atto enquanto o token
@@ -273,27 +282,16 @@ há tabela nem log com telefone, CPF ou nome de cliente.
 
 ## Testes
 
-```sh
-cd api && pnpm test     # mocka fetch e o relógio; nunca toca a rede real
-cd web && pnpm test
-```
-
-Por decisão do autor do prompt desta etapa, **novas funcionalidades
-(permissões, admin, coletor, dashboard) não têm testes automatizados** —
-foram verificadas manualmente contra a stack rodando (requisições diretas às
-rotas com `curl`/cookie de sessão, e o coletor executado de verdade contra o
-servidor real da Atto com um token inválido só para confirmar os caminhos).
-A lógica de permissões (`resolvePermission`) é escrita como função pura,
-sem I/O, especificamente para poder ser testada depois.
-
-A suíte existente da API (`api/tests/`, do login) cobre, com `fetch` e
-relógio injetados: primeiro login (cria usuário, cifra o token), logins/
-logouts repetidos (zero chamadas à Atto), senha errada dentro e depois da
-janela de cooldown, `Error` da Atto, `CustomerSid` divergente, usuário
-inativo, timeout/5xx (`503`), `429` da Atto (cooldown), e que senha/token
-nunca aparecem em respostas HTTP nem em logs. `DATABASE_URL_TEST` (banco
-separado, sufixo `_test`) precisa estar configurado e acessível — ele é
-truncado a cada teste.
+**Por decisão explícita, não há suíte de testes automatizados neste
+repositório** (nem `vitest`, nem `@playwright/test` como dependência). Todo
+fluxo — login/logout, o bootstrap do primeiro administrador, admin de
+perfis/usuários, os quatro casos de resolução de permissão, o coletor e o
+dashboard — foi verificado manualmente contra a stack rodando: requisições
+diretas às rotas com `curl`/cookie de sessão (confirmando `401`/`403`
+inclusive sem passar pelo front), e o coletor executado de verdade contra o
+servidor real da Atto. `resolvePermission` (`api/src/permissions/resolve.ts`)
+continua escrita como função pura, sem I/O, especificamente para poder ser
+testada caso uma suíte volte a existir depois.
 
 ```sh
 cd api && pnpm lint && pnpm typecheck
@@ -315,7 +313,9 @@ cd web && pnpm lint && pnpm typecheck
 | Checagem de `Origin` e `Content-Type` em mutações | Mantida | Poucas linhas, já testada, cobre CSRF básico que `SameSite=Lax` só mitiga parcialmente |
 | Criptografia do token da Atto (AES-256-GCM via `node:crypto`) | Mantida, sem lib de terceiros | É o mesmo motor (OpenSSL) que qualquer lib JS de cripto usa por baixo; a única opção que reduziria o código de fato (`@47ng/cloak`) traz 8 dependências transitivas |
 | Validação de env no boot (zod) | Mantida | Evita subir com configuração inválida |
-| Seed de administrador | **Revivido nesta etapa** | Sem RBAC, "sem seed" bastava (o primeiro login já criava o usuário); com RBAC, um usuário novo nasce sem nenhuma permissão, então sem um bootstrap ninguém jamais teria `admin.usuarios` para conceder acesso a alguém. O seed não cria senha nem chama a Atto — só garante os perfis e dá Administrador ao login configurado |
+| Seed de administrador | **Removido de novo, substituído por bootstrap no próprio login** | Um seed script chegou a existir para resolver "ninguém nasce com permissão", mas ainda criava um usuário/perfil sem conta Atto real por trás — rejeitado por decisão explícita de não ter usuário de exemplo nenhum. Em vez disso, `createLoginResolver` concede o perfil Administrador com a árvore inteira ao primeiro login bem-sucedido feito num banco sem nenhum usuário — zero código extra, zero dado fabricado |
+| Token/senha da Atto salvos mesmo quando a sessão é negada (`CustomerSid` divergente) | Mudado | A Atto permite só um `SignIn` por hora; descartar um `SignIn` bem-sucedido por causa de uma checagem posterior desperdiçava essa cota (e, se a checagem estivesse errada, travava a pessoa por uma hora sem recurso). Salvar sempre e checar o tenant depois, inclusive no caminho local, mantém a trava de segurança sem nunca perder um `SignIn` válido |
+| Testes automatizados (os que existiam, do login) | **Removidos, por decisão explícita** | `api/tests/`, `web/tests/`, `vitest`/`@playwright/test` como dependência, e `DATABASE_URL_TEST` — tudo fora |
 | `routes.ts` do login dividido em `login.ts` (decisão pura) + rota HTTP fina | Feito numa etapa anterior | Registrado aqui só para não reabrir: a lógica de negócio do login é testável sem Fastify; não é "mais camadas", é separar as duas responsabilidades que uma função de ~90 linhas acumulava |
 | Camadas de uma rota para outra (admin, dashboard) | Um arquivo `routes.ts` por módulo, sem controller/service/repository | Poucas rotas por módulo; mesma convenção do login |
 | `atto_agent_report` sem coluna de nome do agente | Decisão | O endpoint real (`Agents/Report`) não devolve nome, só `Agent` (login) — guardar uma coluna que nunca seria populada seria código morto |
@@ -334,10 +334,12 @@ cd web && pnpm lint && pnpm typecheck
   senha local primeiro, dentro da janela).
 - **Dois ambientes usando a mesma conta Atto se derrubam um ao outro**: um
   novo `SignIn` invalida o token anterior daquela conta. Em desenvolvimento,
-  evite reutilizar a mesma conta Atto em dois ambientes simultaneamente — e
-  note que o coletor e o login da web **compartilham** essa mesma conta de
-  serviço (`ATTO_LOGIN`), então um login manual do administrador também pode
-  consumir a cota de hora do coletor (e vice-versa).
+  evite reutilizar a mesma conta Atto em dois ambientes simultaneamente. Isso
+  vale também dentro do mesmo ambiente **se** a conta de serviço do coletor
+  (`ATTO_LOGIN`) for a mesma conta usada para logar na web — são contas
+  independentes por padrão (o administrador é só quem logar primeiro, com a
+  conta Atto que quiser), mas compartilhar a mesma conta nas duas pontas
+  significa compartilhar a mesma cota de uma hora.
 - Formatos de campo não confirmados do coletor: ver a seção "O que foi
   verificado contra a Atto real" acima — são as premissas mais prováveis de
   precisar de ajuste com dados reais.
