@@ -15,9 +15,6 @@ export type LoginOutcome =
   | { kind: 'rate_limited'; retryAfterSeconds: number }
   | { kind: 'unavailable' }
 
-/** First user ever to sign in successfully: there's no seed, so without this
- *  bootstrap nobody would ever have admin.usuarios to grant anyone else access.
- *  Also reused by the optional `seed` script (see scripts/seed.ts). */
 export async function grantFullAccess(db: Database, userId: string) {
   const [inserted] = await db.insert(roles).values({ name: 'Administrador' })
     .onConflictDoNothing({ target: roles.name }).returning({ id: roles.id })
@@ -27,18 +24,12 @@ export async function grantFullAccess(db: Database, userId: string) {
   await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing({ target: [userRoles.userId, userRoles.roleId] })
 }
 
-/**
- * All the Atto-login business rules, decoupled from HTTP: local-vs-Atto
- * decision, cooldown, single-flight SignIn, tenant lock, user upsert.
- * The route handler only translates the returned outcome into a response.
- */
 export function createLoginResolver(db: Database, env: Env, deps: {
   fetch?: typeof globalThis.fetch
   now?: () => Date
 } = {}) {
   const fetchImpl = deps.fetch ?? globalThis.fetch
   const now = deps.now ?? (() => new Date())
-  // Dedupe concurrent login attempts for the same user into one Atto SignIn.
   const signInFlights = new Map<string, Promise<Awaited<ReturnType<typeof signIn>>>>()
 
   return async function resolveLogin(username: string, password: string): Promise<LoginOutcome> {
@@ -46,8 +37,6 @@ export function createLoginResolver(db: Database, env: Env, deps: {
     const [user] = await db.select().from(users).where(eq(users.attoLoginNormalized, usernameNormalized))
     if (user && !user.isActive) return { kind: 'rejected' }
 
-    // Local accounts (admin-created, own password) never talk to Atto at all —
-    // no cooldown, no token, no tenant check, just a direct password check.
     if (user?.isLocal) {
       if (!user.passwordHash) return { kind: 'rejected' }
       return (await verifyPassword(user.passwordHash, password)) ? { kind: 'authenticated', user } : { kind: 'rejected' }
@@ -64,7 +53,6 @@ export function createLoginResolver(db: Database, env: Env, deps: {
         return tenantOk(user) ? { kind: 'authenticated', user } : { kind: 'rejected' }
       }
       if (withinCooldown) return { kind: 'rejected' }
-      // Password mismatch after the cooldown window: it may have changed at the Atto side.
     } else if (withinCooldown) {
       const remainingMs = minIntervalMs - (now().getTime() - user!.lastSigninAt!.getTime())
       return { kind: 'rate_limited', retryAfterSeconds: Math.max(Math.ceil(remainingMs / 1000), 1) }
@@ -89,9 +77,6 @@ export function createLoginResolver(db: Database, env: Env, deps: {
       return { kind: 'unavailable' }
     }
 
-    // A successful SignIn is precious (Atto allows one per login per hour), so it's
-    // always persisted below — even if the CustomerSid check rejects the session —
-    // so this exact attempt is never wasted and a retry can reuse it locally.
     const isFirstUserEver = !user && (await db.select({ id: users.id }).from(users).limit(1)).length === 0
 
     const obtainedAt = now()

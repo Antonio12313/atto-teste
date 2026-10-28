@@ -10,8 +10,6 @@ import { rangeQuerySchema, pagedRangeQuerySchema } from './schemas.js'
 const BAD_REQUEST = { statusCode: 400, error: 'Bad Request', message: 'Dados inválidos.' }
 const DASHBOARD_NODES = ALL_NODES.filter(node => node === 'dashboard' || node.startsWith('dashboard.'))
 
-/** Agents/Report and Agents/WorkingTime only carry the agent's login — the
- * real name comes from the separately-collected Agents/List (atto_agents). */
 async function loadAgentNames(db: Database, logins: string[]): Promise<Map<string, string>> {
   if (!logins.length) return new Map()
   const rows = await db.select({ login: attoAgents.login, name: attoAgents.name }).from(attoAgents).where(inArray(attoAgents.login, logins))
@@ -90,7 +88,6 @@ export async function dashboardRoutes(app: FastifyInstance, db: Database, env: E
       .filter(r => matchesSearch(q, r.agentLogin, r.agentName))
       .sort((a, b) => b.answeredCalls - a.answeredCalls)
     const { items: ranking, total } = paginate(fullRanking, page, pageSize)
-    // Agents/Report isn't scoped by campaign in the Atto response, so this block can't filter by it.
     return { ranking, total, page, pageSize, campaignFilterSupported: false }
   })
 

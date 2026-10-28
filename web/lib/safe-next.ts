@@ -6,7 +6,6 @@ export function safeNext(value: unknown): string {
     /[\\\u0000-\u0020]/.test(value)
   )
     return "/dashboard"
-  // Backslashes and encoded slash/control sequences are browser-dependent.
   try {
     const decoded = decodeURIComponent(value)
     if (decoded.startsWith("//") || /[\\\u0000-\u0020]/.test(decoded))

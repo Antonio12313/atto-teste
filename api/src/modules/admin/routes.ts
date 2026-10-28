@@ -24,13 +24,6 @@ async function buildContextFromProposal(db: Database, roleIds: string[], individ
   }
 }
 
-/**
- * Counts active users who are full administrators (every permission node
- * allowed), simulating one proposed change on top of the current DB state —
- * either a role's node set (role edit) or one user's active/roleIds/
- * individual (user edit). Used to enforce "there must always be at least one
- * active administrator" before a change is persisted.
- */
 async function activeFullAdminCount(db: Database, overrides: {
   roleNodes?: { roleId: string; nodes: string[] }
   user?: { userId: string; isActive?: boolean; roleIds?: string[]; individual?: Array<{ node: string; effect: PermissionEffect }> }

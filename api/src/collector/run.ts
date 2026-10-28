@@ -157,14 +157,6 @@ export async function runCollection(db: Database, env: Env, deps: {
       hours.push(h)
     }
 
-    // Campaigns/OutboundCalls can fail for a long stretch (seen live: a
-    // persistent rate-limit cooldown where every call times out or 429s).
-    // Without a budget, 13 campaigns × 24 hours of failing calls takes far
-    // longer than COLLECT_INTERVAL_MINUTES, so the cycle never reaches the
-    // final status update below — the dashboard then shows "no collection
-    // yet" even though campaigns/agents/report data above did collect fine.
-    // Cap this phase so a cycle always finishes; unfetched hours stay
-    // non-final and get retried next cycle.
     const callsDeadlineMs = cycleStartMs + env.COLLECT_INTERVAL_MINUTES * 60_000 * 0.8
     let callsBudgetExceeded = false
     callsLoop: for (const campaign of campaigns) {

@@ -24,7 +24,6 @@ export function buildParentMap(tree: PermissionNode[]): Map<string, string | nul
   return map
 }
 
-/** From `id` up to the root, including `id` itself. */
 export function getAncestors(id: string, parentMap: Map<string, string | null>): string[] {
   const chain: string[] = []
   let current: string | null | undefined = id

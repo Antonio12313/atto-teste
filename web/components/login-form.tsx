@@ -34,7 +34,6 @@ export function LoginForm({ next }: { next: string }) {
     setError("")
     try {
       await api("/auth/login", { body: data })
-      // A full navigation also discards any pre-login Router Cache.
       window.location.assign(safeNext(next))
     } catch (error) {
       setError(

@@ -1,9 +1,3 @@
-// Optional, manual-only: creates one local admin account (SEED_ADMIN_LOGIN/
-// SEED_ADMIN_PASSWORD, both fictitious dev defaults — see .env.example) so
-// there's a way into the app without a real Atto login. Never runs on boot
-// or in compose's CMD; run it yourself with `pnpm seed` when you want it.
-// Idempotent: running it again just re-grants full access if the account
-// already exists, it never resets the password.
 import { eq } from 'drizzle-orm'
 import { readEnv } from '../config/env.js'
 import { createDatabase } from '../db/client.js'

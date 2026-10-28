@@ -26,24 +26,15 @@ export const envSchema = z.object({
   ATTO_CUSTOMER_SID: z.string().trim().min(1),
   ATTO_TOKEN_ENC_KEY: z.string().min(1),
   ATTO_TOKEN_TTL_HOURS: positive.default(23),
-  // Atto itself only accepts one SignIn per login per hour; a lower local value would be pointless.
   ATTO_LOGIN_MIN_INTERVAL_MINUTES: positive.min(60).default(60),
   ATTO_REQUEST_TIMEOUT_MS: positive.max(120000).default(15000),
   COLLECT_INTERVAL_MINUTES: positive.default(15),
   COLLECT_BACKFILL_DAYS: positive.default(7),
   COLLECT_CALLS_LOOKBACK_HOURS: positive.default(24),
-  // Atto rate-limits Agents/* to one call every 6s minimum; enforce the floor here too.
   COLLECT_DELAY_AGENTS_MS: positive.min(6000).default(6000),
   COLLECT_DELAY_OTHERS_MS: positive.default(6000),
-  // Confirmed live: Campaigns/OutboundCalls keeps 429ing even at 6s spacing
-  // (the Agents/* floor) — it needs a longer gap than every other endpoint.
-  // Unconfirmed exact threshold; 15s is a conservative starting point pending
-  // a controlled retest.
   COLLECT_DELAY_CALLS_MS: positive.min(15000).default(15000),
   APP_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
-  // Only read by the optional `pnpm seed` script (never on normal boot) —
-  // creates one local admin account so there's a way in without a real Atto
-  // login. Defaults are a throwaway dev convenience, not meant for prod.
   SEED_ADMIN_LOGIN: z.string().trim().min(1).default('admin'),
   SEED_ADMIN_PASSWORD: z.string().min(8).max(128).default('admin1234'),
 }).superRefine((env, ctx) => {

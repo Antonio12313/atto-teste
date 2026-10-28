@@ -7,8 +7,6 @@ export class ApiError extends Error {
   }
 }
 
-// The API already replies with a localized { message } for every error
-// status it produces, so the client just surfaces that directly.
 export async function api<T = undefined>(
   path: string,
   options: { method?: string; body?: unknown } = {}

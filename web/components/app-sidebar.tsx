@@ -45,10 +45,6 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1]![0] : "")).toUpperCase()
 }
 
-/** True if `permissions` grants `node` itself or any node under it — a role
- * can grant just a leaf (e.g. "dashboard.atto.chamadas") without also
- * granting its parents, so a nav link keyed on a parent node must match on
- * prefix, not just an exact entry. */
 function hasAccess(permissions: string[], node: string): boolean {
   return permissions.some((p) => p === node || p.startsWith(`${node}.`))
 }

@@ -27,7 +27,6 @@ export async function signIn(login: string, password: string, options: {
   const request = options.fetch ?? globalThis.fetch
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs)
-  // The real endpoint is GET with login/password as lowercase query params, not a POST body.
   const query = new URLSearchParams({ login, password })
   let response: Response
   try {

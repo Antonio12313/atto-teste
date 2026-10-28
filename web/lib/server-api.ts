@@ -10,7 +10,6 @@ export class ServerApiError extends Error {
   }
 }
 
-/** Server-side GET against the internal API, forwarding the session cookie. */
 export async function serverApi<T>(path: string): Promise<T> {
   const cookieStore = await cookies()
   const cookie = cookieStore.get("sid")

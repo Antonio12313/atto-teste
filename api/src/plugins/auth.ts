@@ -35,8 +35,6 @@ export function registerAuth(app: FastifyInstance, db: Database, env: Env) {
     request.user = { id: row.user.id, name: row.user.name, atto_login: row.user.attoLogin }
     request.sessionId = row.session.id
   })
-  // Compose after `authenticate` in preHandler: permissions are recomputed
-  // from roles/individual rules on every request, so changes apply right away.
   app.decorate('requirePermission', (nodes: string | string[]) => {
     const required = Array.isArray(nodes) ? nodes : [nodes]
     return async (request: FastifyRequest, reply: FastifyReply) => {

@@ -3,7 +3,6 @@ import type { Database } from '../db/client.js'
 import { userRoles, roles, rolePermissions, userPermissions } from '../db/schema.js'
 import type { ResolveContext, PermissionEffect } from './resolve.js'
 
-/** Loads a user's roles and individual overrides into a ResolveContext. */
 export async function loadResolveContext(db: Database, userId: string): Promise<ResolveContext> {
   const assignedRoles = await db.select({ id: roles.id, name: roles.name }).from(userRoles)
     .innerJoin(roles, eq(roles.id, userRoles.roleId)).where(eq(userRoles.userId, userId))

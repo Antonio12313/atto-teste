@@ -5,14 +5,6 @@ import { users } from '../../db/schema.js'
 import { decryptToken } from './crypto.js'
 import { createLoginResolver } from '../auth/login.js'
 
-/**
- * For the collector's service account: a currently valid token for
- * ATTO_LOGIN. Checks the cached token first (no need for ATTO_PASSWORD on
- * a cache hit); on a miss, asks the same manager the web login route uses
- * (createLoginResolver) to sign in with ATTO_LOGIN/ATTO_PASSWORD, honoring
- * the same cooldown and single-flight. Returns null if no token could be
- * obtained this cycle — the collector should skip and retry next cycle.
- */
 export async function getValidToken(db: Database, env: Env, deps: {
   fetch?: typeof globalThis.fetch
   now?: () => Date

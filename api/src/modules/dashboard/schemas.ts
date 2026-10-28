@@ -16,7 +16,6 @@ export const rangeQuerySchema = z.object(rangeFields)
   .refine(fromBeforeTo, { message: '"from" deve ser anterior ou igual a "to".' })
   .refine(within90Days, { message: 'Intervalo máximo de 90 dias.' })
 
-/** Same range filter, plus pagination and a free-text search (by agent login/name). */
 export const pagedRangeQuerySchema = z.object({
   ...rangeFields,
   page: z.coerce.number().int().min(1).default(1),

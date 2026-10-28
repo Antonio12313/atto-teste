@@ -1,14 +1,5 @@
 import { parseAttoDate, parseDurationSeconds } from './dates.js'
 
-/**
- * Field names here are taken from the real response XML Schema published at
- * each operation's own `.../help/operations/Get_*` page (fetched live
- * 2026-10-27) — NOT guessed. What's still unconfirmed, because the schema
- * only shows placeholder "String content" values, is the exact *format* of
- * a few string fields (durations, dates); see README for how to verify
- * against a real captured response.
- */
-
 function pickString(row: Record<string, unknown>, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = row[key]
@@ -50,10 +41,6 @@ function nullableStringArray(row: Record<string, unknown>, key: string): string[
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : null
 }
 
-// Campaigns/List (Admin service) → confirmed live 2026-10-28 against a real
-// response. No "Name" field — the display text is "Description"; the id is
-// "Sid". Everything else is kept verbatim (see schema.ts comment on
-// attoCampaigns for why it's all nullable and not customer data).
 export interface ExtractedCampaign {
   sid: string
   name: string
@@ -142,10 +129,6 @@ export function extractCampaign(row: Record<string, unknown>): ExtractedCampaign
   }
 }
 
-// Agents/List (Admin service) → confirmed live 2026-10-28 against a real
-// response. `Login` is the natural key. Deliberately excludes `Password`
-// (an agent credential hash from Atto's own system) — see schema.ts comment
-// on attoAgents for why.
 export interface ExtractedAgent {
   login: string
   name: string | null
@@ -221,9 +204,6 @@ export function extractAgent(row: Record<string, unknown>): ExtractedAgent | nul
   }
 }
 
-// Agents/Report → ArrayOfAgentReportResult. Not scoped by campaign at all.
-// CallsCount is the closest match to "atendimentos"; TotalWorkingTime the
-// closest to "tempo de conversação" (durations are strings, format TBD).
 export interface ExtractedAgentReportRow {
   agentLogin: string
   campaignSid: string
@@ -241,10 +221,6 @@ export function extractAgentReportRow(row: Record<string, unknown>): ExtractedAg
   }
 }
 
-// Agents/WorkingTime → ArrayOfAgentWorkingTimeResult. LoggedTime_sec/
-// PauseTime_sec are already plain integer seconds (no parsing needed).
-// "Login" (lowercase) is the agent; "LOGIN"/"LOGOUT" (uppercase) are the
-// session's moments.
 export interface ExtractedWorkingTimeRow {
   sessionKey: string
   agentLogin: string
@@ -268,12 +244,6 @@ export function extractWorkingTimeRow(row: Record<string, unknown>, timeZone: st
   }
 }
 
-// Campaigns/OutboundCalls → confirmed live against a real sample response
-// (2026-10-28): fields are CallDuration (plain seconds, a number — not a
-// formatted "ConvDuration" string), DialMoment ("DD/MM/YYYY HH:MM:SS"),
-// CallHistorySid (per the test spec, its presence marks an answered row).
-// TelNumber (the customer's phone) exists on this row and must never be
-// read here.
 export interface ExtractedCall { momentStart: Date; answered: boolean; talkSeconds: number }
 export function extractCallRow(row: Record<string, unknown>, timeZone: string): ExtractedCall | null {
   const momentStart = pickDate(row, ['DialMoment'], timeZone)

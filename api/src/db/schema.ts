@@ -6,8 +6,6 @@ export const users = pgTable('users', {
   attoLogin: text('atto_login').notNull(),
   attoLoginNormalized: text('atto_login_normalized').notNull().unique(),
   name: text('name').notNull(),
-  // Local accounts have their own admin-set password and never talk to Atto;
-  // everyone else is a mirror of a real Atto account (see auth/login.ts).
   isLocal: boolean('is_local').notNull().default(false),
   attoSid: text('atto_sid'),
   customerSid: text('customer_sid'),
@@ -53,15 +51,6 @@ export const userPermissions = pgTable('user_permissions', {
   effect: text('effect', { enum: ['allow', 'deny'] }).notNull(),
 }, t => [primaryKey({ columns: [t.userId, t.node] })])
 
-// Collector tables: written only by the scheduled collector, read-only for
-// the dashboard. campaignSid defaults to '' (never null) so the natural-key
-// upserts below work — Postgres treats NULL as distinct from NULL in a
-// unique/primary key, which would silently defeat ON CONFLICT dedup.
-// Everything below `name` is the rest of what Campaigns/List returns, kept
-// verbatim (confirmed live 2026-10-28) — none of it is customer data (it's
-// campaign/telephony config: file paths, queue/IVR settings, Sids), so the
-// "no dados pessoais" rule doesn't apply here. All nullable: only one real
-// sample row has been seen, so which fields are ever absent isn't confirmed.
 export const attoCampaigns = pgTable('atto_campaigns', {
   sid: text('sid').primaryKey(),
   name: text('name').notNull(),
@@ -105,16 +94,6 @@ export const attoCampaigns = pgTable('atto_campaigns', {
   welcomeMsg: text('welcome_msg'),
   updatedAt: time('updated_at').notNull().defaultNow(),
 })
-// Agents/List (Admin service, confirmed live 2026-10-28 — same service as
-// Campaigns/List, not the rate-limited Supervision one). Kept verbatim like
-// atto_campaigns, with one deliberate exception: the real response includes
-// a `Password` field (an agent credential hash from Atto's own system) —
-// never stored here, there's no reason for this app to hold another
-// system's credential material, hashed or not. `Login` is the natural key
-// (matches agentLogin elsewhere). Campaign-list fields (ChatCampaigns,
-// InbCampaigns, ManualCampaigns, MediaCampaigns, OutCampaigns) are arrays —
-// kept as jsonb rather than exploded into their own table, since nothing
-// currently queries into them.
 export const attoAgents = pgTable('atto_agents', {
   login: text('login').primaryKey(),
   name: text('name'),

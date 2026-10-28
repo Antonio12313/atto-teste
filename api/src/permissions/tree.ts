@@ -4,8 +4,6 @@ export interface PermissionNode {
   children?: PermissionNode[]
 }
 
-// Fixed in code, not in a table: the API is the single source of truth and
-// serves this same tree to the front end, which never duplicates it.
 export const PERMISSION_TREE: PermissionNode[] = [
   {
     id: 'dashboard', label: 'Dashboard', children: [
@@ -49,7 +47,6 @@ export function isValidNode(node: string): boolean {
   return PARENT_BY_NODE.has(node)
 }
 
-/** From `node` up to the root: [node, parent, grandparent, ...]. */
 export function getAncestorChain(node: string): string[] {
   const chain: string[] = []
   let current: string | null | undefined = node
