@@ -41,6 +41,11 @@ export const envSchema = z.object({
   // a controlled retest.
   COLLECT_DELAY_CALLS_MS: positive.min(15000).default(15000),
   APP_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
+  // Only read by the optional `pnpm seed` script (never on normal boot) —
+  // creates one local admin account so there's a way in without a real Atto
+  // login. Defaults are a throwaway dev convenience, not meant for prod.
+  SEED_ADMIN_LOGIN: z.string().trim().min(1).default('admin'),
+  SEED_ADMIN_PASSWORD: z.string().min(8).max(128).default('admin1234'),
 }).superRefine((env, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
   if (env.NODE_ENV === 'production' && !env.COOKIE_SECURE) issue('COOKIE_SECURE', 'Produção exige HTTPS e COOKIE_SECURE=true')

@@ -16,8 +16,9 @@ export type LoginOutcome =
   | { kind: 'unavailable' }
 
 /** First user ever to sign in successfully: there's no seed, so without this
- *  bootstrap nobody would ever have admin.usuarios to grant anyone else access. */
-async function grantFullAccess(db: Database, userId: string) {
+ *  bootstrap nobody would ever have admin.usuarios to grant anyone else access.
+ *  Also reused by the optional `seed` script (see scripts/seed.ts). */
+export async function grantFullAccess(db: Database, userId: string) {
   const [inserted] = await db.insert(roles).values({ name: 'Administrador' })
     .onConflictDoNothing({ target: roles.name }).returning({ id: roles.id })
   const roleId = inserted?.id ?? (await db.select({ id: roles.id }).from(roles).where(eq(roles.name, 'Administrador')))[0]!.id

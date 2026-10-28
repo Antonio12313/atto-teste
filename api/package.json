@@ -8,6 +8,8 @@
     "collector:dev": "tsx src/collector.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node dist/db/migrate.js",
+    "seed": "node dist/scripts/seed.js",
+    "seed:dev": "tsx src/scripts/seed.ts",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.check.json"
   },

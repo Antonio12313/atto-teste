@@ -28,18 +28,37 @@ com nome/usuário/senha do `.env` e persiste no volume `postgres_data`.
 
 ## Criando o primeiro administrador
 
-**Não há seed nem usuário de exemplo.** Um usuário aqui sempre espelha uma
-conta real na Atto, então o primeiro administrador nasce do primeiro login
-bem-sucedido que qualquer pessoa fizer num banco vazio: se `users` está vazia
-no momento em que o login é criado, esse usuário recebe automaticamente o
-perfil **Administrador** com a árvore inteira liberada (ver
-`grantFullAccess` em `api/src/modules/auth/login.ts`). Logins seguintes não
-ganham nada automaticamente — nascem sem nenhuma permissão, como o resto do
-RBAC exige, e dependem desse primeiro administrador para serem liberados.
+**Por padrão, não sobe nenhum seed nem usuário de exemplo.** Um usuário aqui
+normalmente espelha uma conta real na Atto, então o primeiro administrador
+nasce do primeiro login bem-sucedido que qualquer pessoa fizer num banco
+vazio: se `users` está vazia no momento em que o login é criado, esse
+usuário recebe automaticamente o perfil **Administrador** com a árvore
+inteira liberada (ver `grantFullAccess` em `api/src/modules/auth/login.ts`).
+Logins seguintes não ganham nada automaticamente — nascem sem nenhuma
+permissão, como o resto do RBAC exige, e dependem desse primeiro
+administrador para serem liberados.
 
 Em outras palavras: para começar, basta logar pela tela com **qualquer**
 conta Atto válida contra o `ATTO_CUSTOMER_SID` configurado — essa conta vira
 a administradora.
+
+### Alternativa sem conta Atto: `pnpm seed`
+
+Se você não tem (ou não quer usar ainda) uma conta Atto real à mão, existe
+um script **opcional e manual** que cria um usuário **local** (não espelha
+nada na Atto — mesmo mecanismo de "conta local com senha própria" usado pelo
+admin de usuários) já com acesso total. Ele nunca roda sozinho — nem no
+`docker compose up`, nem no `CMD` da imagem — só quando você pedir:
+
+```sh
+docker compose exec api node dist/scripts/seed.js
+# (ou, fora do Docker, em api/: pnpm seed / pnpm seed:dev)
+```
+
+Login e senha vêm de `SEED_ADMIN_LOGIN`/`SEED_ADMIN_PASSWORD` no `.env`
+(padrão `admin`/`admin1234` — fictícios, só para desenvolvimento). É
+idempotente: rodar de novo não duplica nem reseta a senha, só reconfirma o
+acesso total caso o perfil Administrador tenha sido alterado.
 
 ## Variáveis de ambiente
 
@@ -435,7 +454,7 @@ cd web && pnpm lint && pnpm typecheck
 | Checagem de `Origin` e `Content-Type` em mutações | Mantida | Poucas linhas, já testada, cobre CSRF básico que `SameSite=Lax` só mitiga parcialmente |
 | Criptografia do token da Atto (AES-256-GCM via `node:crypto`) | Mantida, sem lib de terceiros | É o mesmo motor (OpenSSL) que qualquer lib JS de cripto usa por baixo; a única opção que reduziria o código de fato (`@47ng/cloak`) traz 8 dependências transitivas |
 | Validação de env no boot (zod) | Mantida | Evita subir com configuração inválida |
-| Seed de administrador | **Removido de novo, substituído por bootstrap no próprio login** | Um seed script chegou a existir para resolver "ninguém nasce com permissão", mas ainda criava um usuário/perfil sem conta Atto real por trás — rejeitado por decisão explícita de não ter usuário de exemplo nenhum. Em vez disso, `createLoginResolver` concede o perfil Administrador com a árvore inteira ao primeiro login bem-sucedido feito num banco sem nenhum usuário — zero código extra, zero dado fabricado |
+| Seed de administrador | **Removido, depois reintroduzido como script manual e opcional** | Um seed script chegou a existir pra resolver "ninguém nasce com permissão", mas criava um usuário/perfil sem conta Atto real por trás — removido por decisão explícita de não ter usuário de exemplo nenhum. O bootstrap (`createLoginResolver` concede Administrador ao primeiro login bem-sucedido num banco vazio) continua sendo o caminho padrão. O seed voltou depois, mas só como `pnpm seed` — nunca roda sozinho, e cria uma conta **local** (mesmo mecanismo de usuário sem Atto por trás já usado no admin de usuários), não um usuário Atto fingido |
 | Token/senha da Atto salvos mesmo quando a sessão é negada (`CustomerSid` divergente) | Mudado | A Atto permite só um `SignIn` por hora; descartar um `SignIn` bem-sucedido por causa de uma checagem posterior desperdiçava essa cota (e, se a checagem estivesse errada, travava a pessoa por uma hora sem recurso). Salvar sempre e checar o tenant depois, inclusive no caminho local, mantém a trava de segurança sem nunca perder um `SignIn` válido |
 | Testes automatizados (os que existiam, do login) | **Removidos, por decisão explícita** | `api/tests/`, `web/tests/`, `vitest`/`@playwright/test` como dependência, e `DATABASE_URL_TEST` — tudo fora |
 | `routes.ts` do login dividido em `login.ts` (decisão pura) + rota HTTP fina | Feito numa etapa anterior | Registrado aqui só para não reabrir: a lógica de negócio do login é testável sem Fastify; não é "mais camadas", é separar as duas responsabilidades que uma função de ~90 linhas acumulava |
