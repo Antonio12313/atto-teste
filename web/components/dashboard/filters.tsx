@@ -73,7 +73,7 @@ export function DashboardFilters({
     <Card>
       <CardContent className="flex flex-wrap items-end gap-4">
         <div className="flex items-end gap-2">
-          <div className="space-y-1.5">
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="dashboard-from" className="text-xs text-muted-foreground">
               De
             </Label>
@@ -88,7 +88,7 @@ export function DashboardFilters({
               className="w-[9.5rem]"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="dashboard-to" className="text-xs text-muted-foreground">
               Até
             </Label>
@@ -105,7 +105,7 @@ export function DashboardFilters({
           </div>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">Campanha</Label>
           <Select
             value={campaignValue}
