@@ -5,7 +5,7 @@ import type { Database } from '../../db/client.js'
 import { users, roles, rolePermissions, userRoles, userPermissions } from '../../db/schema.js'
 import { isUniqueViolation, isForeignKeyViolation } from '../../db/errors.js'
 import { PERMISSION_TREE, ALL_NODES } from '../../permissions/tree.js'
-import { resolvePermission, type PermissionEffect, type ResolveContext } from '../../permissions/resolve.js'
+import { resolvePermission, isFullAdmin, type PermissionEffect, type ResolveContext } from '../../permissions/resolve.js'
 import { loadResolveContext } from '../../permissions/load.js'
 import { hashPassword } from '../auth/password.js'
 import { roleCreateSchema, roleUpdateSchema, userCreateSchema, userUpdateSchema } from './schemas.js'
@@ -22,6 +22,53 @@ async function buildContextFromProposal(db: Database, roleIds: string[], individ
     roles: roleRows.map(role => ({ name: role.name, nodes: nodesByRole.get(role.id) ?? new Set() })),
     individual: new Map(individual.map(rule => [rule.node, rule.effect])),
   }
+}
+
+/**
+ * Counts active users who are full administrators (every permission node
+ * allowed), simulating one proposed change on top of the current DB state —
+ * either a role's node set (role edit) or one user's active/roleIds/
+ * individual (user edit). Used to enforce "there must always be at least one
+ * active administrator" before a change is persisted.
+ */
+async function activeFullAdminCount(db: Database, overrides: {
+  roleNodes?: { roleId: string; nodes: string[] }
+  user?: { userId: string; isActive?: boolean; roleIds?: string[]; individual?: Array<{ node: string; effect: PermissionEffect }> }
+} = {}): Promise<number> {
+  const [userRows, roleRows, permRows, allUserRoleLinks, allIndividualRows] = await Promise.all([
+    db.select().from(users),
+    db.select().from(roles),
+    db.select().from(rolePermissions),
+    db.select().from(userRoles),
+    db.select().from(userPermissions),
+  ])
+
+  const nodesByRole = new Map<string, Set<string>>(roleRows.map(role => [role.id, new Set<string>()]))
+  for (const row of permRows) nodesByRole.get(row.roleId)?.add(row.node)
+  if (overrides.roleNodes) nodesByRole.set(overrides.roleNodes.roleId, new Set(overrides.roleNodes.nodes))
+  const roleNameById = new Map(roleRows.map(role => [role.id, role.name]))
+
+  const roleIdsByUser = new Map<string, string[]>()
+  for (const link of allUserRoleLinks) roleIdsByUser.set(link.userId, [...(roleIdsByUser.get(link.userId) ?? []), link.roleId])
+  const individualByUser = new Map<string, Array<{ node: string; effect: PermissionEffect }>>()
+  for (const row of allIndividualRows) {
+    individualByUser.set(row.userId, [...(individualByUser.get(row.userId) ?? []), { node: row.node, effect: row.effect as PermissionEffect }])
+  }
+
+  let count = 0
+  for (const user of userRows) {
+    const isOverridden = overrides.user?.userId === user.id
+    const isActive = isOverridden && overrides.user!.isActive !== undefined ? overrides.user!.isActive : user.isActive
+    if (!isActive) continue
+    const roleIds = isOverridden && overrides.user!.roleIds !== undefined ? overrides.user!.roleIds! : (roleIdsByUser.get(user.id) ?? [])
+    const individual = isOverridden && overrides.user!.individual !== undefined ? overrides.user!.individual! : (individualByUser.get(user.id) ?? [])
+    const ctx: ResolveContext = {
+      roles: roleIds.map(roleId => ({ name: roleNameById.get(roleId) ?? '', nodes: nodesByRole.get(roleId) ?? new Set() })),
+      individual: new Map(individual.map(rule => [rule.node, rule.effect])),
+    }
+    if (isFullAdmin(ctx)) count++
+  }
+  return count
 }
 
 async function buildUserDetail(db: Database, userId: string) {
@@ -83,6 +130,13 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     if (!parsed.success) return reply.code(400).send(BAD_REQUEST)
     const [existing] = await db.select().from(roles).where(eq(roles.id, id.data.id))
     if (!existing) return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'Perfil não encontrado.' })
+
+    if (parsed.data.nodes !== undefined) {
+      const remaining = await activeFullAdminCount(db, { roleNodes: { roleId: id.data.id, nodes: parsed.data.nodes } })
+      if (remaining === 0) {
+        return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Essa alteração deixaria o sistema sem nenhum administrador ativo.' })
+      }
+    }
 
     try {
       if (parsed.data.name !== undefined || parsed.data.description !== undefined) {
@@ -167,6 +221,16 @@ export async function adminRoutes(app: FastifyInstance, db: Database) {
     }
 
     const isSelf = id.data.id === request.user!.id
+    const targetIsFullAdmin = isFullAdmin(await loadResolveContext(db, id.data.id))
+    if (targetIsFullAdmin && (parsed.data.isActive === false || parsed.data.roleIds !== undefined || parsed.data.individual !== undefined)) {
+      const remaining = await activeFullAdminCount(db, {
+        user: { userId: id.data.id, isActive: parsed.data.isActive, roleIds: parsed.data.roleIds, individual: parsed.data.individual },
+      })
+      if (remaining === 0) {
+        return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Deve existir sempre ao menos um administrador ativo no sistema.' })
+      }
+    }
+
     if (isSelf && parsed.data.isActive === false) {
       return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'Você não pode desativar sua própria conta.' })
     }

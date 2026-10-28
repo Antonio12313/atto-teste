@@ -42,3 +42,8 @@ export function resolveAllPermissions(ctx: ResolveContext): string[] {
 export function resolveAny(nodes: string[], ctx: ResolveContext): boolean {
   return nodes.some(node => resolvePermission(node, ctx).allowed)
 }
+
+/** True if the user has every permission node — a full administrator. */
+export function isFullAdmin(ctx: ResolveContext): boolean {
+  return resolveAllPermissions(ctx).length === ALL_NODES.length
+}
